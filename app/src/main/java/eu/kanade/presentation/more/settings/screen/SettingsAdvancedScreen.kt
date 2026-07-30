@@ -54,8 +54,8 @@ import eu.kanade.tachiyomi.util.system.isShizukuInstalled
 import eu.kanade.tachiyomi.util.system.powerManager
 import eu.kanade.tachiyomi.util.system.setDefaultSettings
 import eu.kanade.tachiyomi.util.system.toast
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import logcat.LogPriority
 import okhttp3.Headers
 import tachiyomi.core.common.util.lang.launchNonCancellable
@@ -261,7 +261,10 @@ object SettingsAdvancedScreen : SearchableSettings {
                     title = stringResource(MR.strings.pref_ech_config_domain),
                     subtitle = stringResource(MR.strings.pref_ech_config_domain_summary),
                     onValueChanged = {
-                        scope.launch { delay(150); echProxyManager.reload() }
+                        scope.launch {
+                            delay(150)
+                            echProxyManager.reload()
+                        }
                         true
                     },
                 ),
@@ -273,7 +276,10 @@ object SettingsAdvancedScreen : SearchableSettings {
                         val valid = it.split(',').map(String::trim).filter(String::isNotEmpty)
                             .all { endpoint -> endpoint.startsWith("https://") }
                         if (valid) {
-                            scope.launch { delay(150); echProxyManager.reload() }
+                            scope.launch {
+                                delay(150)
+                                echProxyManager.reload()
+                            }
                         }
                         valid
                     },
@@ -283,7 +289,10 @@ object SettingsAdvancedScreen : SearchableSettings {
                     title = stringResource(MR.strings.pref_ech_edge_ips),
                     subtitle = stringResource(MR.strings.pref_ech_edge_ips_summary),
                     onValueChanged = {
-                        scope.launch { delay(150); echProxyManager.reload() }
+                        scope.launch {
+                            delay(150)
+                            echProxyManager.reload()
+                        }
                         true
                     },
                 ),
