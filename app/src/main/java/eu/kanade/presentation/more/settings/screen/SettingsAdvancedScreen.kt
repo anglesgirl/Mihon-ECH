@@ -268,7 +268,10 @@ object SettingsAdvancedScreen : SearchableSettings {
                     title = stringResource(MR.strings.pref_ech_config_domain),
                     subtitle = stringResource(MR.strings.pref_ech_config_domain_summary),
                     onValueChanged = {
-                        scope.launch { delay(150); echProxyManager.reload() }
+                        scope.launch {
+                            delay(150)
+                            echProxyManager.reload()
+                        }
                         true
                     },
                 ),
@@ -280,7 +283,10 @@ object SettingsAdvancedScreen : SearchableSettings {
                         val valid = it.split(',').map(String::trim).filter(String::isNotEmpty)
                             .all { endpoint -> endpoint.startsWith("https://") }
                         if (valid) {
-                            scope.launch { delay(150); echProxyManager.reload() }
+                            scope.launch {
+                                delay(150)
+                                echProxyManager.reload()
+                            }
                         }
                         valid
                     },
@@ -290,7 +296,10 @@ object SettingsAdvancedScreen : SearchableSettings {
                     title = stringResource(MR.strings.pref_ech_edge_ips),
                     subtitle = stringResource(MR.strings.pref_ech_edge_ips_summary),
                     onValueChanged = {
-                        scope.launch { delay(150); echProxyManager.reload() }
+                        scope.launch {
+                            delay(150)
+                            echProxyManager.reload()
+                        }
                         true
                     },
                 ),
