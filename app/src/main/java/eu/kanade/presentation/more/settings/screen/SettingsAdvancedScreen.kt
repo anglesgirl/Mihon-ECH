@@ -49,6 +49,7 @@ import eu.kanade.tachiyomi.network.PREF_DOH_SHECAN
 import eu.kanade.tachiyomi.ui.more.OnboardingScreen
 import eu.kanade.tachiyomi.util.CrashLogUtil
 import eu.kanade.tachiyomi.util.system.GLUtil
+import eu.kanade.tachiyomi.util.system.copyToClipboard
 import eu.kanade.tachiyomi.util.system.isReleaseBuildType
 import eu.kanade.tachiyomi.util.system.isShizukuInstalled
 import eu.kanade.tachiyomi.util.system.powerManager
@@ -254,7 +255,12 @@ object SettingsAdvancedScreen : SearchableSettings {
                 Preference.PreferenceItem.TextPreference(
                     title = stringResource(MR.strings.pref_ech_status),
                     subtitle = echProxyManager.status(),
-                    onClick = { context.toast(echProxyManager.status()) },
+                    onClick = {
+                        context.copyToClipboard(
+                            stringResource(MR.strings.pref_ech_status),
+                            echProxyManager.status(),
+                        )
+                    },
                 ),
                 Preference.PreferenceItem.EditTextPreference(
                     preference = networkPreferences.echConfigDomain,

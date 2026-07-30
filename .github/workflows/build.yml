@@ -54,7 +54,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: anglesgirl/ech-proxy-android
-          ref: 6807044d94e26310403a1daa280d0697f0fed735
+          ref: 7d9a9584791d231103555b6e35b2ecf3a182dde7
           path: app/ech-proxy-source
 
       - name: Build shared ECH proxy AAR
