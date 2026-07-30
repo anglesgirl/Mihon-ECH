@@ -32,6 +32,7 @@ class EchProxyManager(
     }
 
     @Volatile private var port: Int? = null
+
     @Volatile private var activeConfig: Config? = null
 
     override val enabled: Boolean
