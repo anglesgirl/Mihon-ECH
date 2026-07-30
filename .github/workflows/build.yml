@@ -55,7 +55,9 @@ jobs:
           go install golang.org/x/mobile/cmd/gomobile@latest
           export PATH="$PATH:$(go env GOPATH)/bin"
           gomobile init
-          cd app/ech
+          cd app
+          mkdir -p libs
+          cd ech
           go get golang.org/x/mobile/bind@latest
           gomobile bind -target=android/arm64 -androidapi 24 -o ../libs/echproxy.aar ./echproxy
 
