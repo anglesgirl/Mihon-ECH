@@ -237,7 +237,38 @@ object SettingsAdvancedScreen : SearchableSettings {
                 Preference.PreferenceItem.SwitchPreference(
                     preference = networkPreferences.echEnabled,
                     title = "Encrypted Client Hello (ECH)",
-                    subtitle = "Route AO3 through the local ECH proxy using remote Cloudflare DoH and AS13335 edge IPs",
+                    subtitle = "Route HTTPS requests through the local ECH proxy when enabled",
+                    onValueChanged = {
+                        context.toast(MR.strings.requires_app_restart)
+                        true
+                    },
+                ),
+                Preference.PreferenceItem.EditTextPreference(
+                    preference = networkPreferences.echConfigDomain,
+                    title = "ECH configuration TXT domain",
+                    subtitle = "Public TXT record containing ECH DoH and edge settings",
+                    onValueChanged = {
+                        context.toast(MR.strings.requires_app_restart)
+                        true
+                    },
+                ),
+                Preference.PreferenceItem.EditTextPreference(
+                    preference = networkPreferences.echDohEndpoints,
+                    title = "ECH DoH endpoints",
+                    subtitle = "Comma-separated HTTPS DoH endpoints, tried in order",
+                    onValueChanged = {
+                        val valid = it.split(',').map(String::trim).filter(String::isNotEmpty)
+                            .all { endpoint -> endpoint.startsWith("https://") }
+                        if (valid) {
+                            context.toast(MR.strings.requires_app_restart)
+                        }
+                        valid
+                    },
+                ),
+                Preference.PreferenceItem.EditTextPreference(
+                    preference = networkPreferences.echIpList,
+                    title = "ECH edge IPs",
+                    subtitle = "Optional comma-separated IPs; leave empty to use DoH answers",
                     onValueChanged = {
                         context.toast(MR.strings.requires_app_restart)
                         true
