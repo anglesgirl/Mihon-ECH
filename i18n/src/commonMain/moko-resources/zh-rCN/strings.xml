@@ -535,6 +535,16 @@
     <string name="action_sort_count">作品总数</string>
     <string name="pref_verbose_logging_summary">将详细日志打印到系统日志（会降低应用性能）</string>
     <string name="pref_verbose_logging">详细日志记录</string>
+    <string name="pref_ech">加密客户端问候（ECH）</string>
+    <string name="pref_ech_summary">为 HTTPS 请求使用本地 DoH 与 ECH 传输</string>
+    <string name="pref_ech_status">ECH 状态</string>
+    <string name="pref_ech_config_domain">ECH 配置 TXT 域名</string>
+    <string name="pref_ech_config_domain_summary">包含 DoH、边缘 IP 和备用 ECH 配置的公开 TXT 记录</string>
+    <string name="pref_ech_doh_endpoints">ECH DoH 端点</string>
+    <string name="pref_ech_doh_endpoints_summary">以逗号分隔的 HTTPS DoH 端点，按顺序尝试</string>
+    <string name="pref_ech_edge_ips">ECH 边缘 IP</string>
+    <string name="pref_ech_edge_ips_summary">可选的、以逗号分隔的 Cloudflare IP；留空则使用 DoH 应答</string>
+    <string name="ech_settings_applied">ECH 设置已应用</string>
     <string name="label_warning">警告</string>
     <string name="action_display_language_badge">语言</string>
     <string name="backup_info">你应该将备份数据保存到多个地方。备份可能含有敏感数据（例如储存的密码），分享时请留意。</string>

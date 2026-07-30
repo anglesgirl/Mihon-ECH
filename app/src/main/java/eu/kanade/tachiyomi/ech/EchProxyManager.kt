@@ -4,6 +4,8 @@ import android.content.Context
 import echproxy.Echproxy
 import eu.kanade.tachiyomi.network.EchProxyProvider
 import eu.kanade.tachiyomi.network.NetworkPreferences
+import logcat.LogPriority
+import tachiyomi.core.common.util.system.logcat
 import java.net.InetSocketAddress
 import java.net.ServerSocket
 
@@ -26,7 +28,11 @@ class EchProxyManager(
 
     override fun shouldProxy(host: String): Boolean {
         if (!enabled || host.isBlank()) return false
-        activeConfig ?: runCatching { fetchRemoteConfig() }.getOrNull()?.also { activeConfig = it } ?: return false
+        activeConfig ?: runCatching { fetchRemoteConfig() }
+            .onFailure { logcat(LogPriority.ERROR, it) { "ECH: could not load public configuration" } }
+            .getOrNull()
+            ?.also { activeConfig = it }
+            ?: return false
         return true
     }
 
@@ -44,8 +50,9 @@ class EchProxyManager(
                 context.filesDir.resolve("mihon-ech-public-config.json").absolutePath,
                 false,
             )
+            logcat(LogPriority.INFO) { "ECH: local proxy started on 127.0.0.1:$selectedPort" }
             InetSocketAddress("127.0.0.1", selectedPort).also { port = selectedPort }
-        }.getOrNull()
+        }.onFailure { logcat(LogPriority.ERROR, it) { "ECH: local proxy failed to start" } }.getOrNull()
     }
 
     @Synchronized
@@ -54,6 +61,15 @@ class EchProxyManager(
         port = null
         activeConfig = null
     }
+
+    @Synchronized
+    override fun reload(): InetSocketAddress? {
+        stop()
+        return if (enabled) start() else null
+    }
+
+    override fun status(): String = runCatching { Echproxy.lastStatus() }
+        .getOrDefault("ECH proxy is not running")
 
     private fun fetchRemoteConfig(): Config {
         val configuredDoh = preferences.echDohEndpoints.get()

@@ -31,6 +31,7 @@ import eu.kanade.presentation.more.settings.screen.advanced.ClearDatabaseScreen
 import eu.kanade.presentation.more.settings.screen.debug.DebugInfoScreen
 import eu.kanade.tachiyomi.data.download.DownloadCache
 import eu.kanade.tachiyomi.data.library.MetadataUpdateJob
+import eu.kanade.tachiyomi.ech.EchProxyManager
 import eu.kanade.tachiyomi.network.NetworkHelper
 import eu.kanade.tachiyomi.network.NetworkPreferences
 import eu.kanade.tachiyomi.network.PREF_DOH_360
@@ -54,6 +55,7 @@ import eu.kanade.tachiyomi.util.system.powerManager
 import eu.kanade.tachiyomi.util.system.setDefaultSettings
 import eu.kanade.tachiyomi.util.system.toast
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import logcat.LogPriority
 import okhttp3.Headers
 import tachiyomi.core.common.util.lang.launchNonCancellable
@@ -199,7 +201,9 @@ object SettingsAdvancedScreen : SearchableSettings {
         networkPreferences: NetworkPreferences,
     ): Preference.PreferenceGroup {
         val context = LocalContext.current
+        val scope = rememberCoroutineScope()
         val networkHelper = remember { Injekt.get<NetworkHelper>() }
+        val echProxyManager = remember { Injekt.get<EchProxyManager>() }
 
         val userAgentPref = networkPreferences.defaultUserAgent
         val userAgent by userAgentPref.collectAsState()
@@ -236,41 +240,50 @@ object SettingsAdvancedScreen : SearchableSettings {
                 ),
                 Preference.PreferenceItem.SwitchPreference(
                     preference = networkPreferences.echEnabled,
-                    title = "Encrypted Client Hello (ECH)",
-                    subtitle = "Route HTTPS requests through the local ECH proxy when enabled",
+                    title = stringResource(MR.strings.pref_ech),
+                    subtitle = stringResource(MR.strings.pref_ech_summary),
                     onValueChanged = {
-                        context.toast(MR.strings.requires_app_restart)
+                        scope.launch {
+                            delay(150)
+                            echProxyManager.reload()
+                            context.toast(MR.strings.ech_settings_applied)
+                        }
                         true
                     },
                 ),
+                Preference.PreferenceItem.TextPreference(
+                    title = stringResource(MR.strings.pref_ech_status),
+                    subtitle = echProxyManager.status(),
+                    onClick = { context.toast(echProxyManager.status()) },
+                ),
                 Preference.PreferenceItem.EditTextPreference(
                     preference = networkPreferences.echConfigDomain,
-                    title = "ECH configuration TXT domain",
-                    subtitle = "Public TXT record containing ECH DoH and edge settings",
+                    title = stringResource(MR.strings.pref_ech_config_domain),
+                    subtitle = stringResource(MR.strings.pref_ech_config_domain_summary),
                     onValueChanged = {
-                        context.toast(MR.strings.requires_app_restart)
+                        scope.launch { delay(150); echProxyManager.reload() }
                         true
                     },
                 ),
                 Preference.PreferenceItem.EditTextPreference(
                     preference = networkPreferences.echDohEndpoints,
-                    title = "ECH DoH endpoints",
-                    subtitle = "Comma-separated HTTPS DoH endpoints, tried in order",
+                    title = stringResource(MR.strings.pref_ech_doh_endpoints),
+                    subtitle = stringResource(MR.strings.pref_ech_doh_endpoints_summary),
                     onValueChanged = {
                         val valid = it.split(',').map(String::trim).filter(String::isNotEmpty)
                             .all { endpoint -> endpoint.startsWith("https://") }
                         if (valid) {
-                            context.toast(MR.strings.requires_app_restart)
+                            scope.launch { delay(150); echProxyManager.reload() }
                         }
                         valid
                     },
                 ),
                 Preference.PreferenceItem.EditTextPreference(
                     preference = networkPreferences.echIpList,
-                    title = "ECH edge IPs",
-                    subtitle = "Optional comma-separated IPs; leave empty to use DoH answers",
+                    title = stringResource(MR.strings.pref_ech_edge_ips),
+                    subtitle = stringResource(MR.strings.pref_ech_edge_ips_summary),
                     onValueChanged = {
-                        context.toast(MR.strings.requires_app_restart)
+                        scope.launch { delay(150); echProxyManager.reload() }
                         true
                     },
                 ),

@@ -603,6 +603,16 @@
     <string name="label_network">Networking</string>
     <string name="pref_clear_cookies">Clear cookies</string>
     <string name="pref_dns_over_https">DNS over HTTPS (DoH)</string>
+    <string name="pref_ech">Encrypted Client Hello (ECH)</string>
+    <string name="pref_ech_summary">Use the local DoH and ECH transport for HTTPS requests</string>
+    <string name="pref_ech_status">ECH status</string>
+    <string name="pref_ech_config_domain">ECH configuration TXT domain</string>
+    <string name="pref_ech_config_domain_summary">Public TXT record containing DoH, edge IP, and fallback ECH settings</string>
+    <string name="pref_ech_doh_endpoints">ECH DoH endpoints</string>
+    <string name="pref_ech_doh_endpoints_summary">Comma-separated HTTPS DoH endpoints, tried in order</string>
+    <string name="pref_ech_edge_ips">ECH edge IPs</string>
+    <string name="pref_ech_edge_ips_summary">Optional comma-separated Cloudflare IPs; leave empty to use DoH answers</string>
+    <string name="ech_settings_applied">ECH settings applied</string>
     <string name="pref_user_agent_string">Default user agent string</string>
     <string name="error_user_agent_string_blank">User agent string can not be blank</string>
     <string name="error_user_agent_string_invalid">Invalid user agent string</string>
