@@ -10,4 +10,10 @@ interface EchProxyProvider {
     fun shouldProxy(host: String): Boolean
     fun start(): InetSocketAddress?
     fun stop()
+
+    /** Applies changed public ECH settings without restarting the application. */
+    fun reload(): InetSocketAddress?
+
+    /** Human-readable state from the local proxy, suitable for diagnostics. */
+    fun status(): String
 }

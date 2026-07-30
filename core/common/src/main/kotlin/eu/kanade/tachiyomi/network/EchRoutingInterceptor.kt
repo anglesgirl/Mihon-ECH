@@ -2,6 +2,8 @@ package eu.kanade.tachiyomi.network
 
 import okhttp3.Interceptor
 import okhttp3.Response
+import logcat.LogPriority
+import tachiyomi.core.common.util.system.logcat
 
 /**
  * Routes opted-in HTTPS requests through the shared local DoH/ECH transport.
@@ -17,7 +19,11 @@ class EchRoutingInterceptor : Interceptor {
             return chain.proceed(request)
         }
 
-        val endpoint = provider.start() ?: return chain.proceed(request)
+        val endpoint = provider.start() ?: run {
+            logcat(LogPriority.ERROR) { "ECH: proxy unavailable; using the normal client for $host" }
+            return chain.proceed(request)
+        }
+        logcat(LogPriority.INFO) { "ECH: routing $host through local DoH proxy" }
         val rewritten = request.newBuilder()
             .url(
                 request.url.newBuilder()
