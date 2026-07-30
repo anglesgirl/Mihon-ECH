@@ -39,6 +39,7 @@ class NetworkHelper(
                 ),
             )
             .addInterceptor(UncaughtExceptionInterceptor())
+            .addInterceptor(EchRoutingInterceptor())
             .addInterceptor(UserAgentInterceptor(::defaultUserAgentProvider))
 
         if (preferences.verboseLogging.get()) {
