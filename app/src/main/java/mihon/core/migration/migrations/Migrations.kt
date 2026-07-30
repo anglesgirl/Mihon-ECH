@@ -6,6 +6,7 @@ val migrations: List<Migration>
     get() = listOf(
         SetupBackupCreateMigration(),
         SetupLibraryUpdateMigration(),
+        DefaultExtensionStoreMigration(),
         TrustExtensionRepositoryMigration(),
         CategoryPreferencesCleanupMigration(),
         InstallationIdMigration(),
