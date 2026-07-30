@@ -12,6 +12,9 @@ class NetworkPreferences(
 
     val dohProvider: Preference<Int> = preferenceStore.getInt("doh_provider", -1)
 
+    // Separate from ordinary DoH: enables the local TLS 1.3 ECH proxy for AO3.
+    val echEnabled: Preference<Boolean> = preferenceStore.getBoolean("ech_enabled", false)
+
     val defaultUserAgent: Preference<String> = preferenceStore.getString(
         "default_user_agent",
         "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Mobile Safari/537.36",

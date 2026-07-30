@@ -204,6 +204,7 @@ baselineProfile {
 }
 
 dependencies {
+    implementation(files("libs/echproxy.aar"))
     baselineProfile(projects.baselineProfile)
 
     implementation(projects.i18n)

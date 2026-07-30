@@ -234,6 +234,15 @@ object SettingsAdvancedScreen : SearchableSettings {
                         }
                     },
                 ),
+                Preference.PreferenceItem.SwitchPreference(
+                    preference = networkPreferences.echEnabled,
+                    title = "Encrypted Client Hello (ECH)",
+                    subtitle = "Route AO3 through the local ECH proxy using remote Cloudflare DoH and AS13335 edge IPs",
+                    onValueChanged = {
+                        context.toast(MR.strings.requires_app_restart)
+                        true
+                    },
+                ),
                 Preference.PreferenceItem.ListPreference(
                     preference = networkPreferences.dohProvider,
                     entries = mapOf(
