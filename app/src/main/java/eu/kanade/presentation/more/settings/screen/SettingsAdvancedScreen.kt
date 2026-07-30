@@ -208,6 +208,7 @@ object SettingsAdvancedScreen : SearchableSettings {
 
         val userAgentPref = networkPreferences.defaultUserAgent
         val userAgent by userAgentPref.collectAsState()
+        val echStatusTitle = stringResource(MR.strings.pref_ech_status)
 
         return Preference.PreferenceGroup(
             title = stringResource(MR.strings.label_network),
@@ -253,11 +254,11 @@ object SettingsAdvancedScreen : SearchableSettings {
                     },
                 ),
                 Preference.PreferenceItem.TextPreference(
-                    title = stringResource(MR.strings.pref_ech_status),
+                    title = echStatusTitle,
                     subtitle = echProxyManager.status(),
                     onClick = {
                         context.copyToClipboard(
-                            stringResource(MR.strings.pref_ech_status),
+                            echStatusTitle,
                             echProxyManager.status(),
                         )
                     },
