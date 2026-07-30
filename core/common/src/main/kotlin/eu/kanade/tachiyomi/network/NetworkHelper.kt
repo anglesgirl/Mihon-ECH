@@ -30,8 +30,12 @@ class NetworkHelper(
                 ),
             )
             .addInterceptor(UncaughtExceptionInterceptor())
-            .addInterceptor(EchRoutingInterceptor())
             .addInterceptor(UserAgentInterceptor(::defaultUserAgentProvider))
+            // Keep the original URL visible to CloudflareInterceptor so its
+            // WebView challenge flow can open the real host. ECH routing must
+            // be the final application interceptor before the network call.
+            .addInterceptor(CloudflareInterceptor(context, cookieJar, ::defaultUserAgentProvider))
+            .addInterceptor(EchRoutingInterceptor())
 
         if (preferences.verboseLogging.get()) {
             val httpLoggingInterceptor = HttpLoggingInterceptor().apply {
@@ -57,11 +61,7 @@ class NetworkHelper(
         }
     }
 
-    val client = clientBuilder
-        .addInterceptor(
-            CloudflareInterceptor(context, cookieJar, ::defaultUserAgentProvider),
-        )
-        .build()
+    val client = clientBuilder.build()
 
     /**
      * @deprecated Since extension-lib 1.5
