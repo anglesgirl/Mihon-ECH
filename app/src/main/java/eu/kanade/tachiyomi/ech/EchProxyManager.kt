@@ -9,30 +9,41 @@ import java.net.ServerSocket
 
 /**
  * Starts the on-device ECH reverse proxy used by the opt-in network interceptor.
- * Remote settings are intentionally public: only DoH endpoint URLs and Cloudflare
- * AS13335 edge IPs are read from the TXT record; no cookies or credentials leave
- * the app during bootstrap.
+ * Its bootstrap domain, DoH failover endpoints, and optional edge IP list are
+ * user-configurable. The TXT record can still supply refreshed public endpoints
+ * and IPs; no cookies or credentials leave the app during bootstrap.
  */
 class EchProxyManager(
     private val context: Context,
     private val preferences: NetworkPreferences,
 ) : EchProxyProvider {
     @Volatile private var port: Int? = null
+    @Volatile private var activeConfig: Config? = null
 
     override val enabled: Boolean
         get() = preferences.echEnabled.get()
 
-    fun isProtectedHost(host: String): Boolean =
-        host == "archiveofourown.org" || host == "www.archiveofourown.org"
+    /**
+     * Route every valid HTTPS host through the local DoH transport while the
+     * feature is enabled. The Go module then chooses per host: AS13335 plus a
+     * host-owned HTTPS ech= record gets ECH; every other host gets ordinary TLS
+     * over its DoH-resolved addresses.
+     */
+    override fun shouldProxy(host: String): Boolean {
+        if (!enabled || host.isBlank()) return false
+        val config = activeConfig ?: runCatching { fetchRemoteConfig() }.getOrNull() ?: return false
+        activeConfig = config
+        return true
+    }
 
     override fun start(): InetSocketAddress? {
         port?.let { return InetSocketAddress("127.0.0.1", it) }
         return try {
-            val config = fetchRemoteConfig()
+            val config = activeConfig ?: fetchRemoteConfig().also { activeConfig = it }
             val selectedPort = ServerSocket(0).use { it.localPort }
             Echproxy.start(
                 "127.0.0.1:$selectedPort",
-                "archiveofourown.org",
+                "mihon.invalid",
                 "",
                 config.doh.joinToString(","),
                 config.ips,
@@ -51,21 +62,31 @@ class EchProxyManager(
             Echproxy.stop()
         } catch (_: Throwable) { }
         port = null
+        activeConfig = null
     }
 
     private fun fetchRemoteConfig(): Config {
-        val bootstrap = listOf(
-            "https://pieqllv9i7.cloudflare-gateway.com/dns-query",
-            "https://m2b4x7vw98.cloudflare-gateway.com/dns-query",
-            "https://dz1598pphb.cloudflare-gateway.com/dns-query",
-        )
-        val txt = bootstrap.firstNotNullOfOrNull { doh ->
-            try {
-                Echproxy.fetchTxt(doh, "ech-config.anglesgirl.eu.org")
-            } catch (_: Throwable) {
-                null
+        val configuredDoh = preferences.echDohEndpoints.get()
+            .split(',')
+            .map(String::trim)
+            .filter { it.startsWith("https://") }
+        val bootstrap = configuredDoh.ifEmpty {
+            listOf(
+                "https://pieqllv9i7.cloudflare-gateway.com/dns-query",
+                "https://m2b4x7vw98.cloudflare-gateway.com/dns-query",
+                "https://dz1598pphb.cloudflare-gateway.com/dns-query",
+            )
+        }
+        val configDomain = preferences.echConfigDomain.get().trim().trimEnd('.')
+        val txt = configDomain.takeIf { it.isNotBlank() }?.let { domain ->
+            bootstrap.firstNotNullOfOrNull { doh ->
+                try {
+                    Echproxy.fetchTxt(doh, domain)
+                } catch (_: Throwable) {
+                    null
+                }
             }
-        } ?: return Config(bootstrap, "")
+        } ?: return Config(bootstrap, preferences.echIpList.get().trim())
         val values = txt.split(';', '\n').mapNotNull {
             val i = it.indexOf('=')
             if (i <= 0) null else it.substring(0, i).trim().lowercase() to it.substring(i + 1).trim()
@@ -73,7 +94,7 @@ class EchProxyManager(
         val dohs = listOfNotNull(values["doh"], values["doh2"], values["doh3"])
             .filter { it.startsWith("https://") }
             .ifEmpty { bootstrap }
-        val ips = values["ip"] ?: values["ips"] ?: ""
+        val ips = values["ip"] ?: values["ips"] ?: preferences.echIpList.get().trim()
         return Config(dohs, ips)
     }
 
