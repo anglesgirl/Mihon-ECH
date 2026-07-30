@@ -1,8 +1,8 @@
 package eu.kanade.tachiyomi.network
 
+import logcat.LogPriority
 import okhttp3.Interceptor
 import okhttp3.Response
-import logcat.LogPriority
 import tachiyomi.core.common.util.system.logcat
 
 /**
