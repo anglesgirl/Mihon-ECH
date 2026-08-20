@@ -1,10 +1,10 @@
 package eu.kanade.tachiyomi.network
 
 import android.content.Context
+import com.anglesgirl.ech.Ech
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
-import com.anglesgirl.ech.Ech
 import eu.kanade.tachiyomi.network.interceptor.CloudflareInterceptor
 import eu.kanade.tachiyomi.network.interceptor.UncaughtExceptionInterceptor
 import eu.kanade.tachiyomi.network.interceptor.UserAgentInterceptor
