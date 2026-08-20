@@ -205,6 +205,9 @@ baselineProfile {
 }
 
 dependencies {
+    implementation(files("libs/echproxy.aar"))
+    implementation(files("libs/ech-android.aar"))
+
     baselineProfile(projects.baselineProfile)
 
     implementation(projects.i18n)

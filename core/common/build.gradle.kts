@@ -20,8 +20,8 @@ kotlin {
 }
 
 dependencies {
-    api(files("libs/echproxy.aar"))
-    api(files("libs/ech-android.aar"))
+    compileOnly(files("libs/echproxy-classes.jar"))
+    compileOnly(files("libs/ech-android-classes.jar"))
 
     implementation(projects.core.metro)
     implementation(projects.i18n)
