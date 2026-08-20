@@ -20,6 +20,9 @@ kotlin {
 }
 
 dependencies {
+    api(files("libs/echproxy.aar"))
+    api(files("libs/ech-android.aar"))
+
     implementation(projects.core.metro)
     implementation(projects.i18n)
 

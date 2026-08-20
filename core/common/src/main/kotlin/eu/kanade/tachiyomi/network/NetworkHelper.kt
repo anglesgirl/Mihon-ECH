@@ -4,6 +4,7 @@ import android.content.Context
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
+import com.anglesgirl.ech.Ech
 import eu.kanade.tachiyomi.network.interceptor.CloudflareInterceptor
 import eu.kanade.tachiyomi.network.interceptor.UncaughtExceptionInterceptor
 import eu.kanade.tachiyomi.network.interceptor.UserAgentInterceptor
@@ -62,11 +63,11 @@ class NetworkHelper(
         }
     }
 
-    val client = clientBuilder
-        .addInterceptor(
+    val client = Ech.wrapOkHttp(
+        clientBuilder.addInterceptor(
             CloudflareInterceptor(context, cookieJar, ::defaultUserAgentProvider),
-        )
-        .build()
+        ),
+    ).build()
 
     /**
      * @deprecated Since extension-lib 1.5
