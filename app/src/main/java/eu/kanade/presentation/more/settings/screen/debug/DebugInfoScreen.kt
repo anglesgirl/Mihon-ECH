@@ -1,6 +1,7 @@
 package eu.kanade.presentation.more.settings.screen.debug
 
 import android.os.Build
+import android.widget.Toast
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Autorenew
 import androidx.compose.material3.Icon
@@ -16,6 +17,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.profileinstaller.ProfileVerifier
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
+import com.anglesgirl.ech.Ech
 import eu.kanade.presentation.more.settings.Preference
 import eu.kanade.presentation.more.settings.PreferenceScaffold
 import eu.kanade.presentation.more.settings.screen.about.AboutScreen
@@ -48,10 +50,40 @@ class DebugInfoScreen : Screen() {
                         title = BackupSchemaScreen.TITLE,
                         onClick = { navigator.push(BackupSchemaScreen()) },
                     ),
+                    getEchDiagnosticsGroup(),
                     getAppInfoGroup(),
                     getDeviceInfoGroup(),
                 )
             },
+        )
+    }
+
+    @Composable
+    private fun getEchDiagnosticsGroup(): Preference.PreferenceGroup {
+        val context = LocalContext.current
+        val scope = rememberCoroutineScope()
+        val status = if (Ech.isRunning) "运行中，端口 ${Ech.port}" else "未运行，端口 ${Ech.port}"
+        return Preference.PreferenceGroup(
+            title = "ECH 网络",
+            preferenceItems = listOf(
+                Preference.PreferenceItem.TextPreference(
+                    title = "ECH 代理状态",
+                    subtitle = status,
+                    onClick = { context.copyToClipboard("ECH 状态", Ech.diagnosticsText()) },
+                ),
+                Preference.PreferenceItem.TextPreference(
+                    title = "上传 ECH 诊断日志",
+                    subtitle = "上传到 Oracle 日志管道，便于远程排查",
+                    onClick = {
+                        scope.launch {
+                            val ok = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                Ech.uploadDiagnostics(context)
+                            }
+                            Toast.makeText(context, if (ok) "ECH 日志已上传" else "ECH 日志上传失败", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                ),
+            ),
         )
     }
 
