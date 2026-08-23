@@ -38,6 +38,7 @@ import eu.kanade.tachiyomi.data.coil.TachiyomiImageDecoder
 import eu.kanade.tachiyomi.data.notification.Notifications
 import eu.kanade.tachiyomi.di.AppModule
 import eu.kanade.tachiyomi.di.PreferenceModule
+import eu.kanade.tachiyomi.ech.EchDiagnostics
 import eu.kanade.tachiyomi.ech.EchProxyManager
 import eu.kanade.tachiyomi.network.NetworkHelper
 import eu.kanade.tachiyomi.network.NetworkPreferences
@@ -101,6 +102,13 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
         Injekt.importModule(AppModule(this))
         Injekt.importModule(DomainModule())
 
+        val echDiagnostics = EchDiagnostics(this)
+        echDiagnostics.start()
+        echDiagnostics.event(
+            "ech_config",
+            "enabled=${networkPreferences.echEnabled.get()} domain=${networkPreferences.echConfigDomain.get()}",
+        )
+        Injekt.get<EchProxyManager>().setDiagnostics(echDiagnostics)
         Injekt.get<EchProxyManager>().startAsync()
 
         setupNotificationChannels()

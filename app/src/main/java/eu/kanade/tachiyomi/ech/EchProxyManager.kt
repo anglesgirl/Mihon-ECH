@@ -25,10 +25,17 @@ class EchProxyManager(
     @Volatile private var activeConfig: Config? = null
     private val executor = Executors.newSingleThreadExecutor()
 
+    @Volatile private var diagnostics: EchDiagnostics? = null
+
+    fun setDiagnostics(value: EchDiagnostics) {
+        diagnostics = value
+    }
+
     override val enabled: Boolean
         get() = preferences.echEnabled.get()
 
     fun startAsync() {
+        diagnostics?.event("proxy_start_requested", "enabled=$enabled")
         if (enabled) executor.execute { start() }
     }
 
@@ -46,6 +53,12 @@ class EchProxyManager(
         port?.let { return InetSocketAddress("127.0.0.1", it) }
         return runCatching {
             val config = activeConfig ?: fetchRemoteConfig().also { activeConfig = it }
+            diagnostics?.event(
+                "proxy_config",
+                "doh_count=${config.doh.size} ip_count=${config.ips.split(',').count {
+                    it.isNotBlank()
+                }} ech_config=${config.echConfigList.isNotBlank()}",
+            )
             val selectedPort = ServerSocket(0).use { it.localPort }
             Echproxy.start(
                 "127.0.0.1:$selectedPort",
@@ -54,8 +67,12 @@ class EchProxyManager(
                 true,
             )
             logcat(LogPriority.INFO) { "ECH: local proxy started on 127.0.0.1:$selectedPort" }
+            diagnostics?.event("proxy_started", "status=${Echproxy.lastStatus()} port=$selectedPort")
             InetSocketAddress("127.0.0.1", selectedPort).also { port = selectedPort }
-        }.onFailure { logcat(LogPriority.ERROR, it) { "ECH: local proxy failed to start" } }.getOrNull()
+        }.onFailure {
+            diagnostics?.event("proxy_start_failed", "error=${it.javaClass.simpleName}: ${it.message}")
+            logcat(LogPriority.ERROR, it) { "ECH: local proxy failed to start" }
+        }.getOrNull()
     }
 
     @Synchronized
