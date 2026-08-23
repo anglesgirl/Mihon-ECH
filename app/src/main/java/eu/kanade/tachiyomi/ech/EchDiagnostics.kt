@@ -25,8 +25,6 @@ class EchDiagnostics(private val context: Context) {
 
     @Volatile private var lastGoSnapshot = ""
 
-    @Volatile private var lastUploadAt = 0L
-
     fun start() {
         append(
             "startup",
@@ -45,14 +43,7 @@ class EchDiagnostics(private val context: Context) {
     }
 
     fun uploadNow() {
-        val now = System.currentTimeMillis()
-        if (now - lastUploadAt < 60_000) return
-        lastUploadAt = now
-        scope.launch {
-            flushGoLogs()
-            val ok = runCatching { com.anglesgirl.ech.Ech.uploadDiagnostics(context) }.getOrDefault(false)
-            append("diagnostics_upload", "success=$ok")
-        }
+        flushGoLogs()
     }
 
     private fun flushGoLogs() {
