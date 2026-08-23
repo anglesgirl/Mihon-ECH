@@ -52,7 +52,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: anglesgirl/ech-proxy-go
-          ref: 7855aedea0877b5984f78e31a53dd9ca6a1ca81c
+          ref: c3c7b005c4fcafea3d5ae2508d6a6d04f0593d9a
           path: app/ech-proxy-source
 
       - name: Build shared ECH proxy AAR

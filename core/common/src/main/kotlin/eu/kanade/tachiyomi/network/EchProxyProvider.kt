@@ -16,4 +16,7 @@ interface EchProxyProvider {
 
     /** Human-readable state from the local proxy, suitable for diagnostics. */
     fun status(): String
+
+    /** Records a bounded, host-scoped diagnostic event in the app layer. */
+    fun diagnostic(name: String, detail: String = "") {}
 }
