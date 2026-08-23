@@ -19,11 +19,13 @@ class EchRoutingInterceptor : Interceptor {
             return chain.proceed(request)
         }
 
+        logcat(LogPriority.INFO) { "ECH: request intercepted host=$host" }
         val endpoint = provider.start() ?: run {
-            logcat(LogPriority.ERROR) { "ECH: proxy unavailable; using the normal client for $host" }
-            return chain.proceed(request)
+            val message = "ECH proxy unavailable for $host"
+            logcat(LogPriority.ERROR) { "ECH: $message; refusing direct TLS" }
+            throw java.io.IOException(message)
         }
-        logcat(LogPriority.INFO) { "ECH: routing $host through local DoH proxy" }
+        logcat(LogPriority.INFO) { "ECH: routing $host through local DoH proxy endpoint=${endpoint.hostString}:${endpoint.port}" }
         val rewritten = request.newBuilder()
             .url(
                 request.url.newBuilder()
