@@ -25,7 +25,9 @@ class EchRoutingInterceptor : Interceptor {
             logcat(LogPriority.ERROR) { "ECH: $message; refusing direct TLS" }
             throw java.io.IOException(message)
         }
-        logcat(LogPriority.INFO) { "ECH: routing $host through local DoH proxy endpoint=${endpoint.hostString}:${endpoint.port}" }
+        logcat(LogPriority.INFO) {
+            "ECH: routing $host through local DoH proxy endpoint=${endpoint.hostString}:${endpoint.port}"
+        }
         val rewritten = request.newBuilder()
             .url(
                 request.url.newBuilder()
