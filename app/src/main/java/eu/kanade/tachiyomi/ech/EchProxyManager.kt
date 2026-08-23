@@ -52,6 +52,7 @@ class EchProxyManager(
         return true
     }
 
+    @Synchronized
     override fun start(): InetSocketAddress? {
         port?.let { return InetSocketAddress("127.0.0.1", it) }
         return runCatching {
