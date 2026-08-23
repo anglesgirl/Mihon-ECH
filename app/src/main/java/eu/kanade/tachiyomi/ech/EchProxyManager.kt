@@ -8,9 +8,10 @@ import logcat.LogPriority
 import tachiyomi.core.common.util.system.logcat
 import java.net.InetSocketAddress
 import java.net.ServerSocket
+import java.util.concurrent.Executors
 
 /**
- * Lifecycle and public configuration bridge for the shared ech-proxy-android
+ * Lifecycle and public configuration bridge for the shared ech-proxy-go
  * AAR. The proxy makes the final per-host choice: AS13335 targets receive ECH
  * (target HTTPS ech= first, then TXT fallback); all other targets use ordinary
  * TLS over DoH-resolved addresses.
@@ -22,9 +23,14 @@ class EchProxyManager(
     @Volatile private var port: Int? = null
 
     @Volatile private var activeConfig: Config? = null
+    private val executor = Executors.newSingleThreadExecutor()
 
     override val enabled: Boolean
         get() = preferences.echEnabled.get()
+
+    fun startAsync() {
+        if (enabled) executor.execute { start() }
+    }
 
     override fun shouldProxy(host: String): Boolean {
         if (!enabled || host.isBlank()) return false
@@ -43,12 +49,9 @@ class EchProxyManager(
             val selectedPort = ServerSocket(0).use { it.localPort }
             Echproxy.start(
                 "127.0.0.1:$selectedPort",
-                "mihon.invalid",
-                config.echConfigList,
                 config.doh.joinToString(","),
-                config.ips,
                 context.filesDir.resolve("mihon-ech-public-config.json").absolutePath,
-                false,
+                true,
             )
             logcat(LogPriority.INFO) { "ECH: local proxy started on 127.0.0.1:$selectedPort" }
             InetSocketAddress("127.0.0.1", selectedPort).also { port = selectedPort }
@@ -72,21 +75,10 @@ class EchProxyManager(
         .getOrDefault("ECH proxy is not running")
 
     private fun fetchRemoteConfig(): Config {
-        val configuredDoh = preferences.echDohEndpoints.get()
-            .split(',')
-            .map(String::trim)
-            .filter { it.startsWith("https://") }
-        val bootstrap = configuredDoh.ifEmpty {
-            listOf(
-                "https://pieqllv9i7.cloudflare-gateway.com/dns-query",
-                "https://m2b4x7vw98.cloudflare-gateway.com/dns-query",
-                "https://dz1598pphb.cloudflare-gateway.com/dns-query",
-            )
-        }
         val domain = preferences.echConfigDomain.get().trim().trimEnd('.')
-        val txt = domain.takeIf { it.isNotEmpty() }?.let { name ->
-            bootstrap.firstNotNullOfOrNull { doh -> runCatching { Echproxy.fetchTxt(doh, name) }.getOrNull() }
-        } ?: return Config(bootstrap, preferences.echIpList.get().trim(), "")
+        val txt = domain.takeIf { it.isNotEmpty() }
+            ?.let { name -> runCatching { Echproxy.fetchBootstrapTxt(name) }.getOrNull() }
+            ?: throw IllegalStateException("ECH bootstrap TXT unavailable")
         val values = txt.split(';', '\n').mapNotNull { item ->
             val separator = item.indexOf('=')
             item.takeIf { separator > 0 }?.let {
@@ -94,8 +86,10 @@ class EchProxyManager(
             }
         }.toMap()
         val dohs = listOfNotNull(values["doh"], values["doh2"], values["doh3"])
+            .flatMap { it.split(',') }
+            .map(String::trim)
             .filter { it.startsWith("https://") }
-            .ifEmpty { bootstrap }
+        if (dohs.isEmpty()) throw IllegalStateException("ECH bootstrap TXT has no DoH endpoints")
         return Config(
             dohs,
             values["ip"] ?: values["ips"] ?: preferences.echIpList.get().trim(),
