@@ -22,6 +22,7 @@ class EchRoutingInterceptor : Interceptor {
         logcat(LogPriority.INFO) { "ECH: request intercepted host=$host" }
         val endpoint = provider.start() ?: run {
             val message = "ECH proxy unavailable for $host"
+            provider.diagnostic("proxy_start_failed", "host=$host")
             logcat(LogPriority.ERROR) { "ECH: $message; refusing direct TLS" }
             throw java.io.IOException(message)
         }
@@ -38,6 +39,11 @@ class EchRoutingInterceptor : Interceptor {
             )
             .header("X-Ech-Target", host)
             .build()
-        return chain.proceed(rewritten)
+        return runCatching { chain.proceed(rewritten) }.onFailure {
+            provider.diagnostic(
+                "request_failed",
+                "host=$host error=${it.javaClass.simpleName}: ${it.message}",
+            )
+        }.getOrThrow()
     }
 }
