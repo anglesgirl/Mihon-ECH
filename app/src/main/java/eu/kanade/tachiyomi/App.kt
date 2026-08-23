@@ -148,6 +148,12 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
             Security.insertProviderAt(Conscrypt.newProvider(), 1)
         }
 
+        // Start the local ECH proxy early so the first network request can use it.
+        // (Metro port: the manager is already injected eagerly above; the old
+        // Injekt.get() call cannot resolve it since MetroInjektRegistrar only
+        // exposes a fixed set of bindings.)
+        echProxyManager.startAsync()
+
         setupNotificationChannels()
 
         ProcessLifecycleOwner.get().lifecycle.addObserver(this)
