@@ -29,7 +29,7 @@ dependencies {
     api(libs.okhttp.logging)
     api(libs.okhttp.brotli)
     api(libs.okhttp.dnsOverHttps)
-    api(files("libs/ech-release.aar"))
+    compileOnly(files("libs/ech-sdk-classes.jar"))
     api(libs.okio)
 
     implementation(libs.image.decoder)
