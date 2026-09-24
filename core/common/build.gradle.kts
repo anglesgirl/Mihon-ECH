@@ -29,6 +29,7 @@ dependencies {
     api(libs.okhttp.logging)
     api(libs.okhttp.brotli)
     api(libs.okhttp.dnsOverHttps)
+    api(files("libs/ech-release.aar"))
     api(libs.okio)
 
     implementation(libs.image.decoder)

@@ -31,21 +31,8 @@ import eu.kanade.presentation.more.settings.screen.advanced.ClearDatabaseScreen
 import eu.kanade.presentation.more.settings.screen.debug.DebugInfoScreen
 import eu.kanade.tachiyomi.data.download.DownloadCache
 import eu.kanade.tachiyomi.data.library.MetadataUpdateJob
-import eu.kanade.tachiyomi.ech.EchProxyManager
 import eu.kanade.tachiyomi.network.NetworkHelper
 import eu.kanade.tachiyomi.network.NetworkPreferences
-import eu.kanade.tachiyomi.network.PREF_DOH_360
-import eu.kanade.tachiyomi.network.PREF_DOH_ADGUARD
-import eu.kanade.tachiyomi.network.PREF_DOH_ALIDNS
-import eu.kanade.tachiyomi.network.PREF_DOH_CLOUDFLARE
-import eu.kanade.tachiyomi.network.PREF_DOH_CONTROLD
-import eu.kanade.tachiyomi.network.PREF_DOH_DNSPOD
-import eu.kanade.tachiyomi.network.PREF_DOH_GOOGLE
-import eu.kanade.tachiyomi.network.PREF_DOH_MULLVAD
-import eu.kanade.tachiyomi.network.PREF_DOH_NJALLA
-import eu.kanade.tachiyomi.network.PREF_DOH_QUAD101
-import eu.kanade.tachiyomi.network.PREF_DOH_QUAD9
-import eu.kanade.tachiyomi.network.PREF_DOH_SHECAN
 import eu.kanade.tachiyomi.ui.more.OnboardingScreen
 import eu.kanade.tachiyomi.util.CrashLogUtil
 import eu.kanade.tachiyomi.util.system.GLUtil
@@ -55,7 +42,6 @@ import eu.kanade.tachiyomi.util.system.isShizukuInstalled
 import eu.kanade.tachiyomi.util.system.powerManager
 import eu.kanade.tachiyomi.util.system.setDefaultSettings
 import eu.kanade.tachiyomi.util.system.toast
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import logcat.LogPriority
 import okhttp3.Headers
@@ -67,7 +53,6 @@ import tachiyomi.domain.library.service.LibraryPreferences
 import tachiyomi.domain.manga.interactor.ResetViewerFlags
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.i18n.stringResource
-import tachiyomi.presentation.core.util.collectAsState
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import java.io.File
@@ -204,11 +189,8 @@ object SettingsAdvancedScreen : SearchableSettings {
         val context = LocalContext.current
         val scope = rememberCoroutineScope()
         val networkHelper = remember { Injekt.get<NetworkHelper>() }
-        val echProxyManager = remember { Injekt.get<EchProxyManager>() }
 
         val userAgentPref = networkPreferences.defaultUserAgent
-        val userAgent by userAgentPref.collectAsState()
-        val echStatusTitle = stringResource(MR.strings.pref_ech_status)
 
         return Preference.PreferenceGroup(
             title = stringResource(MR.strings.label_network),
@@ -238,69 +220,6 @@ object SettingsAdvancedScreen : SearchableSettings {
                             logcat(LogPriority.ERROR, e)
                             context.toast(MR.strings.cache_delete_error)
                         }
-                    },
-                ),
-                Preference.PreferenceItem.SwitchPreference(
-                    preference = networkPreferences.echEnabled,
-                    title = stringResource(MR.strings.pref_ech),
-                    subtitle = stringResource(MR.strings.pref_ech_summary),
-                    onValueChanged = {
-                        scope.launch {
-                            delay(150)
-                            echProxyManager.reload()
-                            context.toast(MR.strings.ech_settings_applied)
-                        }
-                        true
-                    },
-                ),
-                Preference.PreferenceItem.TextPreference(
-                    title = echStatusTitle,
-                    subtitle = echProxyManager.status(),
-                    onClick = {
-                        context.copyToClipboard(
-                            echStatusTitle,
-                            echProxyManager.status(),
-                        )
-                    },
-                ),
-                Preference.PreferenceItem.EditTextPreference(
-                    preference = networkPreferences.echConfigDomain,
-                    title = stringResource(MR.strings.pref_ech_config_domain),
-                    subtitle = stringResource(MR.strings.pref_ech_config_domain_summary),
-                    onValueChanged = {
-                        scope.launch {
-                            delay(150)
-                            echProxyManager.reload()
-                        }
-                        true
-                    },
-                ),
-                Preference.PreferenceItem.EditTextPreference(
-                    preference = networkPreferences.echDohEndpoints,
-                    title = stringResource(MR.strings.pref_ech_doh_endpoints),
-                    subtitle = stringResource(MR.strings.pref_ech_doh_endpoints_summary),
-                    onValueChanged = {
-                        val valid = it.split(',').map(String::trim).filter(String::isNotEmpty)
-                            .all { endpoint -> endpoint.startsWith("https://") }
-                        if (valid) {
-                            scope.launch {
-                                delay(150)
-                                echProxyManager.reload()
-                            }
-                        }
-                        valid
-                    },
-                ),
-                Preference.PreferenceItem.EditTextPreference(
-                    preference = networkPreferences.echIpList,
-                    title = stringResource(MR.strings.pref_ech_edge_ips),
-                    subtitle = stringResource(MR.strings.pref_ech_edge_ips_summary),
-                    onValueChanged = {
-                        scope.launch {
-                            delay(150)
-                            echProxyManager.reload()
-                        }
-                        true
                     },
                 ),
                 Preference.PreferenceItem.ListPreference(

@@ -43,28 +43,6 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
 
-      - name: Set up Go for ECH proxy
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.26.x'
-
-      - name: Check out shared ECH proxy source
-        uses: actions/checkout@v4
-        with:
-          repository: anglesgirl/ech-proxy-go
-          ref: c3c7b005c4fcafea3d5ae2508d6a6d04f0593d9a
-          path: app/ech-proxy-source
-
-      - name: Build shared ECH proxy AAR
-        run: |
-          go install golang.org/x/mobile/cmd/gomobile@latest
-          export PATH="$PATH:$(go env GOPATH)/bin"
-          gomobile init
-          cd app/ech-proxy-source
-          go test ./mobile/echproxy ./internal/proxy ./internal/dns ./internal/tlsconn
-          mkdir -p ../libs
-          gomobile bind -target=android/arm64 -androidapi 26 -o ../libs/echproxy.aar ./mobile/echproxy
-
       - name: Check code format
         run: ./gradlew spotlessCheck
 

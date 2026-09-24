@@ -4,6 +4,7 @@ import android.content.Context
 import eu.kanade.tachiyomi.network.interceptor.CloudflareInterceptor
 import eu.kanade.tachiyomi.network.interceptor.UncaughtExceptionInterceptor
 import eu.kanade.tachiyomi.network.interceptor.UserAgentInterceptor
+import com.anglesgirl.echsdk.EchSdk
 import okhttp3.Cache
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -18,6 +19,7 @@ class NetworkHelper(
     val cookieJar = AndroidCookieJar()
 
     private val clientBuilder: OkHttpClient.Builder = run {
+        EchSdkState.install(context)
         val builder = OkHttpClient.Builder()
             .cookieJar(cookieJar)
             .connectTimeout(30, TimeUnit.SECONDS)
@@ -31,11 +33,7 @@ class NetworkHelper(
             )
             .addInterceptor(UncaughtExceptionInterceptor())
             .addInterceptor(UserAgentInterceptor(::defaultUserAgentProvider))
-            // Keep the original URL visible to CloudflareInterceptor so its
-            // WebView challenge flow can open the real host. ECH routing must
-            // be the final application interceptor before the network call.
             .addInterceptor(CloudflareInterceptor(context, cookieJar, ::defaultUserAgentProvider))
-            .addInterceptor(EchRoutingInterceptor())
 
         if (preferences.verboseLogging.get()) {
             val httpLoggingInterceptor = HttpLoggingInterceptor().apply {
@@ -59,6 +57,10 @@ class NetworkHelper(
             PREF_DOH_SHECAN -> builder.dohShecan()
             else -> builder
         }
+
+        if (EchSdkState.enabled) EchSdk.configure(builder)
+
+        builder
     }
 
     val client = clientBuilder.build()
