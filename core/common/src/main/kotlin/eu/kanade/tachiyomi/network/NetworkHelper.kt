@@ -1,7 +1,6 @@
 package eu.kanade.tachiyomi.network
 
 import android.content.Context
-import com.anglesgirl.echsdk.EchSdk
 import eu.kanade.tachiyomi.network.interceptor.CloudflareInterceptor
 import eu.kanade.tachiyomi.network.interceptor.UncaughtExceptionInterceptor
 import eu.kanade.tachiyomi.network.interceptor.UserAgentInterceptor
@@ -19,7 +18,6 @@ class NetworkHelper(
     val cookieJar = AndroidCookieJar()
 
     private val clientBuilder: OkHttpClient.Builder = run {
-        EchSdkState.install(context)
         val builder = OkHttpClient.Builder()
             .cookieJar(cookieJar)
             .connectTimeout(30, TimeUnit.SECONDS)
@@ -58,8 +56,7 @@ class NetworkHelper(
             else -> builder
         }
 
-        if (EchSdkState.enabled) EchSdk.configure(builder)
-
+        if (EchSdkState.enabled) builder.also(EchSdk::configure)
         builder
     }
 

@@ -1,6 +1,7 @@
 package eu.kanade.tachiyomi.di
 
 import android.app.Application
+import android.util.Log
 import androidx.core.content.ContextCompat
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import app.cash.sqldelight.db.SqlDriver
@@ -17,6 +18,7 @@ import eu.kanade.tachiyomi.data.download.DownloadProvider
 import eu.kanade.tachiyomi.data.saver.ImageSaver
 import eu.kanade.tachiyomi.data.track.TrackerManager
 import eu.kanade.tachiyomi.extension.ExtensionManager
+import eu.kanade.tachiyomi.network.EchSdkState
 import eu.kanade.tachiyomi.network.JavaScriptEngine
 import eu.kanade.tachiyomi.network.NetworkHelper
 import eu.kanade.tachiyomi.source.AndroidSourceManager
@@ -130,15 +132,16 @@ class AppModule(val app: Application) : InjektModule {
         addSingletonFactory { LocalCoverManager(app, get()) }
         addSingletonFactory { StorageManager(app, get()) }
 
-        // Asynchronously init expensive components for a faster cold start
-        ContextCompat.getMainExecutor(app).execute {
-            get<NetworkHelper>()
-
-            get<SourceManager>()
-
-            get<Database>()
-
-            get<DownloadManager>()
+        // ECH 只做本地 Conscrypt 初始化，不发网络请求；放后台完成后再创建网络客户端。
+        java.util.concurrent.Executors.newSingleThreadExecutor().execute {
+            runCatching { EchSdkState.install(app) }
+                .onFailure { Log.e("Mihon-ECH", "后台初始化失败", it) }
+            ContextCompat.getMainExecutor(app).execute {
+                get<NetworkHelper>()
+                get<SourceManager>()
+                get<Database>()
+                get<DownloadManager>()
+            }
         }
     }
 }
