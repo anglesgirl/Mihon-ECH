@@ -5,6 +5,7 @@
 /.idea/* text eol=crlf
 
 # Gradle wrapper
+*.aar binary
 *.jar binary
 
 # Images
