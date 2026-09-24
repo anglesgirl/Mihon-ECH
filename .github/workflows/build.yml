@@ -61,7 +61,7 @@ jobs:
           path: app/build/reports/tests/testDebugUnitTest
 
       - name: Build app
-        run: ./gradlew assembleRelease -Pinclude-telemetry -Penable-updater
+        run: ./gradlew assembleRelease -Pinclude-telemetry -Penable-updater -PappVersionCode=2026092401 -PappVersionName=0.20.1-echfix1
 
       - name: Upload APK
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

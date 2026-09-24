@@ -32,8 +32,8 @@ android {
     defaultConfig {
         applicationId = "app.mihon"
 
-        versionCode = 26
-        versionName = "0.20.1"
+        versionCode = providers.gradleProperty("appVersionCode").orElse("26").get().toInt()
+        versionName = providers.gradleProperty("appVersionName").orElse("0.20.1").get()
 
         buildConfigField("String", "COMMIT_COUNT", "\"${getLatestCommitCount()}\"")
         buildConfigField("String", "COMMIT_SHA", "\"${getLatestCommitSha()}\"")

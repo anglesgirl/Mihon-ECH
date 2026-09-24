@@ -57,6 +57,7 @@ class NetworkHelper(
             else -> builder
         }
 
+        // ECH 已在后台初始化；失败则沿用宿主默认网络客户端。
         if (EchSdkState.enabled) builder.also(EchSdk::configure)
         builder
     }
