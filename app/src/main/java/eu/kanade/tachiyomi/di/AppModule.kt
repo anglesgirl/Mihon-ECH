@@ -132,7 +132,7 @@ class AppModule(val app: Application) : InjektModule {
         addSingletonFactory { LocalCoverManager(app, get()) }
         addSingletonFactory { StorageManager(app, get()) }
 
-        // ECH 只做本地 Conscrypt 初始化，不发网络请求；放后台完成后再创建网络客户端。
+        // ECH 初始化提前到后台；主线程后续只创建已就绪的网络客户端。
         java.util.concurrent.Executors.newSingleThreadExecutor().execute {
             runCatching { EchSdkState.install(app) }
                 .onFailure { Log.e("Mihon-ECH", "后台初始化失败", it) }

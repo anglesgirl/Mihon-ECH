@@ -57,6 +57,7 @@ class NetworkHelper(
             else -> builder
         }
 
+        EchSdkState.install(context)
         if (EchSdkState.enabled) builder.also(EchSdk::configure)
         builder
     }

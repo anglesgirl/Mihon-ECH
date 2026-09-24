@@ -6,7 +6,7 @@ import com.anglesgirl.echsdk.EchLogger
 import com.anglesgirl.echsdk.EchSdk
 
 /** 将 ECH 初始化和网络配置完全移出启动界面路径。 */
-internal object EchSdkState {
+object EchSdkState {
     private const val TAG = "Mihon-ECH"
     private const val ENABLED = true
 
