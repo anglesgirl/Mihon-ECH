@@ -1,6 +1,7 @@
 package eu.kanade.tachiyomi.network
 
 import android.content.Context
+import com.anglesgirl.echsdk.EchSdk
 import eu.kanade.tachiyomi.network.interceptor.CloudflareInterceptor
 import eu.kanade.tachiyomi.network.interceptor.UncaughtExceptionInterceptor
 import eu.kanade.tachiyomi.network.interceptor.UserAgentInterceptor
