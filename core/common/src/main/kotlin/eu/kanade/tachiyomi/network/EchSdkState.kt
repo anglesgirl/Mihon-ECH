@@ -19,7 +19,9 @@ object EchSdkState {
             EchSdk.install(
                 context = context.applicationContext,
                 config = EchSdk.Config(
-                    protectedHosts = setOf("archiveofourown.org"),
+                    protectedHosts = setOf(
+                        "archiveofourown.org",
+                    ),
                     dohUrl = null,
                     dohBootstrapIps = emptyList(),
                     userAgent = null,
