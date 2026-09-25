@@ -31,7 +31,9 @@ object KatHttp3State {
         val resolver = object : DnsResolver {
             override fun resolve(host: String, port: Int): List<dev.kathttp3.ResolvedAddress> {
                 val resolved = upstream.resolve(host, port)
-                if (host.equals(PROBE_HOST, ignoreCase = true) && resolved.none { it.echConfig?.isNotEmpty() == true }) {
+                if (host.equals(PROBE_HOST, ignoreCase = true) &&
+                    resolved.none { it.echConfig?.isNotEmpty() == true }
+                ) {
                     throw IOException("DoH 未返回 $PROBE_HOST 的 ECH 配置，已阻止明文连接")
                 }
                 return resolved
