@@ -4,6 +4,7 @@ import com.anglesgirl.echsdk.EchDoh
 import eu.kanade.tachiyomi.network.AndroidCookieJar
 import eu.kanade.tachiyomi.network.KatHttp3State
 import kotlinx.coroutines.runBlocking
+import logcat.LogPriority
 import okhttp3.Headers
 import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
@@ -12,6 +13,7 @@ import okhttp3.Request
 import okhttp3.Response
 import okhttp3.ResponseBody.Companion.toResponseBody
 import okio.Buffer
+import tachiyomi.core.common.util.system.logcat
 import java.io.IOException
 
 /** H3优先处理无登录态的 Cloudflare GET/HEAD；失败沿用 OkHttp。 */
@@ -20,15 +22,26 @@ class CloudflareH3Interceptor(
 ) : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
         val request = chain.request()
-        if (!shouldUseH3(request)) return chain.proceed(request)
+        if (!shouldUseH3(request)) {
+            logcat(LogPriority.DEBUG) { "ECH/H3: skip url=${request.url} method=${request.method}" }
+            return chain.proceed(request)
+        }
 
         val requestHeaders = request.headers.toMultimap().flatMap { (name, values) ->
             values.map { name to it }
         }.toMutableList()
         val cookies = cookieJar.get(request.url)
+        val cookieHeader = cookies.joinToString("; ") { it.toString() }
         if (cookies.isNotEmpty()) {
-            requestHeaders += "cookie" to cookies.joinToString("; ") { it.toString() }
+            requestHeaders += "cookie" to cookieHeader
         }
+        logcat(LogPriority.INFO) {
+            "ECH/H3: send url=${request.url} method=${request.method} " +
+                "cookies=${cookies.size} " +
+                "cf_clearance=${cookieHeader.contains("cf_clearance=")} " +
+                "__cf_bm=${cookieHeader.contains("__cf_bm=")}"
+        }
+
         val body = request.body?.let { requestBody ->
             val buffer = Buffer()
             requestBody.writeTo(buffer)
@@ -44,6 +57,9 @@ class CloudflareH3Interceptor(
                 )
             }
         } catch (error: Exception) {
+            logcat(LogPriority.WARN, error) {
+                "ECH/H3: transport fail url=${request.url} method=${request.method}"
+            }
             if (request.method == "GET" || request.method == "HEAD") return chain.proceed(request)
             throw IOException("H3 ${request.method} 传输失败，不自动重发以避免重复提交", error)
         }
@@ -53,11 +69,27 @@ class CloudflareH3Interceptor(
         }.build()
         cookieJar.saveSetCookieHeaders(request.url, responseHeaders.values("set-cookie"))
 
+        val status = h3Response.status
+        logcat(LogPriority.INFO) {
+            "ECH/H3: response url=${request.url} status=$status " +
+                "server=${responseHeaders["server"] ?: "-"} " +
+                "cf-ray=${responseHeaders["cf-ray"] ?: "-"}"
+        }
+        if (status == 403 || status == 400) {
+            // 403 body 能区分 CF 拦截类型：
+            // 空 body/纯文本 = BIC 直接拒绝（TLS 指纹不符，不给挑战）；
+            // 含 turnstile/js challenge = CF 有下发验证页，但客户端拿不到/没渲染。
+            val bodySnippet = h3Response.body.decodeToString().take(1000)
+            logcat(LogPriority.WARN) {
+                "ECH/H3: $status body=$bodySnippet"
+            }
+        }
+
         return Response.Builder()
             .request(request)
             .protocol(Protocol.HTTP_3)
-            .code(h3Response.status)
-            .message("HTTP ${h3Response.status}")
+            .code(status)
+            .message("HTTP $status")
             .headers(responseHeaders)
             .body(
                 h3Response.body.toResponseBody(
