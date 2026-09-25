@@ -8,9 +8,9 @@ import coil3.fetch.FetchResult
 import coil3.fetch.Fetcher
 import coil3.fetch.SourceFetchResult
 import coil3.request.Options
+import com.anglesgirl.echsdk.EchDoh
 import eu.kanade.tachiyomi.network.KatHttp3State
 import eu.kanade.tachiyomi.network.await
-import com.anglesgirl.echsdk.EchDoh
 import okhttp3.Call
 import okhttp3.Request
 import okio.FileSystem
