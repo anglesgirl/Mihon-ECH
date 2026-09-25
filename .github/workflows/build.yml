@@ -62,6 +62,14 @@ jobs:
           path: app/build/reports/tests/testDebugUnitTest
 
       - name: Build app
+        env:
+          # 固定签名：所有 CI 构建使用同一 keystore，保证 APK 签名不变，
+          # 避免覆盖安装失败/信任记录丢失导致扩展需重装
+          MIHON_GITHUB_RELEASE: true
+          storeFileBase64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          storePassword: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          keyAlias: ${{ secrets.RELEASE_KEY_ALIAS }}
+          keyPassword: ${{ secrets.RELEASE_KEY_PASSWORD }}
         run: ./gradlew assembleRelease -Pinclude-telemetry -Penable-updater -PappVersionCode=2026092401 -PappVersionName=0.20.1-echfix1
 
       - name: Upload APK
