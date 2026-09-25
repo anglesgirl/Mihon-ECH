@@ -204,6 +204,7 @@ baselineProfile {
 }
 
 dependencies {
+    implementation(files("libs/kathttp3-ech.aar"))
     implementation(files("libs/ech-release.aar"))
     baselineProfile(projects.baselineProfile)
 

@@ -30,6 +30,7 @@ dependencies {
     api(libs.okhttp.brotli)
     api(libs.okhttp.dnsOverHttps)
     compileOnly(files("libs/ech-sdk-classes.jar"))
+    compileOnly(files("libs/kathttp3-ech-classes.jar"))
     api(libs.okio)
 
     implementation(libs.image.decoder)
