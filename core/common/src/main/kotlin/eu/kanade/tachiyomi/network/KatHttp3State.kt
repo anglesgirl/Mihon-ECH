@@ -16,6 +16,7 @@ object KatHttp3State {
     private const val ENABLED = true
 
     @Volatile private var applicationContext: Context? = null
+
     @Volatile private var client: KatHttp3Client? = null
 
     @Synchronized
