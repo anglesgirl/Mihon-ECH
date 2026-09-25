@@ -111,22 +111,6 @@ object SettingsAdvancedScreen : SearchableSettings {
                 onClick = { navigator.push(DebugInfoScreen()) },
             ),
             Preference.PreferenceItem.TextPreference(
-                title = stringResource(MR.strings.pref_kathttp3_probe),
-                subtitle = stringResource(MR.strings.pref_kathttp3_probe_summary),
-                onClick = {
-                    scope.launch {
-                        runCatching { KatHttp3State.probeAo3Trace() }
-                            .onSuccess { trace ->
-                                context.copyToClipboard("AO3 H3/ECH", trace)
-                                context.toast(MR.strings.pref_kathttp3_probe_success)
-                            }
-                            .onFailure { error ->
-                                context.toast("H3 + ECH 测试失败：${error.message.orEmpty()}")
-                            }
-                    }
-                },
-            ),
-            Preference.PreferenceItem.TextPreference(
                 title = stringResource(MR.strings.pref_onboarding_guide),
                 onClick = { navigator.push(OnboardingScreen()) },
             ),

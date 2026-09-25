@@ -649,11 +649,6 @@
     <string name="pref_verbose_logging">Verbose logging</string>
     <string name="pref_verbose_logging_summary">Print verbose logs to system log (reduces app performance)</string>
     <string name="pref_debug_info">Debug info</string>
-    <string name="pref_kathttp3_probe">测试 H3 + ECH</string>
-    <string name="pref_kathttp3_probe_summary">请求 AO3 trace，必须返回 HTTP/3 且加密 SNI</string>
-    <string name="pref_kathttp3_probe_success">H3 + ECH 测试成功，结果已复制</string>
-    <string name="pref_kathttp3_probe_failed">H3 + ECH 测试失败：%s</string>
-
     <string name="pref_update_library_manga_titles">Update library manga titles to match source</string>
     <string name="pref_update_library_manga_titles_summary">Warning: if a manga is renamed, it will be removed from the download queue (if present).</string>
 
