@@ -2,8 +2,8 @@ package eu.kanade.tachiyomi.network
 
 import android.content.Context
 import com.anglesgirl.echsdk.EchSdk
-import dev.kathttp3.DohResolver
 import dev.kathttp3.DnsResolver
+import dev.kathttp3.DohResolver
 import dev.kathttp3.KatHttp3Client
 import dev.kathttp3.KatHttp3ClientConfig
 import dev.kathttp3.KatHttp3Request
