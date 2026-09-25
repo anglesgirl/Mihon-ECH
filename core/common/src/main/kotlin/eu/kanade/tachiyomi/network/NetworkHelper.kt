@@ -32,6 +32,7 @@ class NetworkHelper(
             )
             .addInterceptor(UncaughtExceptionInterceptor())
             .addInterceptor(UserAgentInterceptor(::defaultUserAgentProvider))
+            .addInterceptor(CloudflareH3Interceptor(cookieJar))
             .addInterceptor(CloudflareInterceptor(context, cookieJar, ::defaultUserAgentProvider))
 
         if (preferences.verboseLogging.get()) {

@@ -15,6 +15,10 @@ class AndroidCookieJar : CookieJar {
         cookies.forEach { manager.setCookie(urlString, it.toString()) }
     }
 
+    fun saveSetCookieHeaders(url: HttpUrl, setCookieHeaders: List<String>) {
+        setCookieHeaders.forEach { manager.setCookie(url.toString(), it) }
+    }
+
     override fun loadForRequest(url: HttpUrl): List<Cookie> {
         return get(url)
     }
