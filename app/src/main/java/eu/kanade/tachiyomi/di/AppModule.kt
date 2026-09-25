@@ -19,6 +19,7 @@ import eu.kanade.tachiyomi.data.saver.ImageSaver
 import eu.kanade.tachiyomi.data.track.TrackerManager
 import eu.kanade.tachiyomi.extension.ExtensionManager
 import eu.kanade.tachiyomi.network.EchSdkState
+import eu.kanade.tachiyomi.network.KatHttp3State
 import eu.kanade.tachiyomi.network.JavaScriptEngine
 import eu.kanade.tachiyomi.network.NetworkHelper
 import eu.kanade.tachiyomi.source.AndroidSourceManager
@@ -136,6 +137,7 @@ class AppModule(val app: Application) : InjektModule {
         java.util.concurrent.Executors.newSingleThreadExecutor().execute {
             runCatching { EchSdkState.install(app) }
                 .onFailure { Log.e("Mihon-ECH", "后台初始化失败", it) }
+            KatHttp3State.install(app)
             ContextCompat.getMainExecutor(app).execute {
                 get<NetworkHelper>()
                 get<SourceManager>()

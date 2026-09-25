@@ -31,6 +31,7 @@ import eu.kanade.presentation.more.settings.screen.advanced.ClearDatabaseScreen
 import eu.kanade.presentation.more.settings.screen.debug.DebugInfoScreen
 import eu.kanade.tachiyomi.data.download.DownloadCache
 import eu.kanade.tachiyomi.data.library.MetadataUpdateJob
+import eu.kanade.tachiyomi.network.KatHttp3State
 import eu.kanade.tachiyomi.network.NetworkHelper
 import eu.kanade.tachiyomi.network.NetworkPreferences
 import eu.kanade.tachiyomi.network.PREF_DOH_360
@@ -108,6 +109,22 @@ object SettingsAdvancedScreen : SearchableSettings {
             Preference.PreferenceItem.TextPreference(
                 title = stringResource(MR.strings.pref_debug_info),
                 onClick = { navigator.push(DebugInfoScreen()) },
+            ),
+            Preference.PreferenceItem.TextPreference(
+                title = stringResource(MR.strings.pref_kathttp3_probe),
+                subtitle = stringResource(MR.strings.pref_kathttp3_probe_summary),
+                onClick = {
+                    scope.launch {
+                        runCatching { KatHttp3State.probeAo3Trace() }
+                            .onSuccess { trace ->
+                                context.copyToClipboard("AO3 H3/ECH", trace)
+                                context.toast(MR.strings.pref_kathttp3_probe_success)
+                            }
+                            .onFailure { error ->
+                                context.toast("H3 + ECH 测试失败：${error.message.orEmpty()}")
+                            }
+                    }
+                },
             ),
             Preference.PreferenceItem.TextPreference(
                 title = stringResource(MR.strings.pref_onboarding_guide),
