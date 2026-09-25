@@ -31,6 +31,7 @@ import eu.kanade.presentation.more.settings.screen.advanced.ClearDatabaseScreen
 import eu.kanade.presentation.more.settings.screen.debug.DebugInfoScreen
 import eu.kanade.tachiyomi.data.download.DownloadCache
 import eu.kanade.tachiyomi.data.library.MetadataUpdateJob
+import eu.kanade.tachiyomi.ech.EchLogExporter
 import eu.kanade.tachiyomi.network.KatHttp3State
 import eu.kanade.tachiyomi.network.NetworkHelper
 import eu.kanade.tachiyomi.network.NetworkPreferences
@@ -281,6 +282,17 @@ object SettingsAdvancedScreen : SearchableSettings {
                     onClick = {
                         userAgentPref.delete()
                         context.toast(MR.strings.requires_app_restart)
+                    },
+                ),
+                Preference.PreferenceItem.TextPreference(
+                    title = "导出诊断日志（ECH/H3）",
+                    onClick = {
+                        context.startActivity(
+                            Intent.createChooser(
+                                EchLogExporter.shareIntent(context),
+                                "分享诊断日志",
+                            ),
+                        )
                     },
                 ),
             ),

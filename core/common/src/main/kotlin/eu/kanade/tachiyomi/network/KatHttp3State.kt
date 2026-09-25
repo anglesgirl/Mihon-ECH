@@ -31,14 +31,22 @@ object KatHttp3State {
         body: ByteArray?,
     ): dev.kathttp3.KatHttp3Response = withContext(Dispatchers.IO) {
         check(ENABLED) { "KatHttp3 未启用" }
-        getClient().execute(
-            KatHttp3Request(
-                method = method,
-                url = url,
-                headers = headers.map { (name, value) -> KatHttp3Header(name, value) },
-                body = body,
-            ),
-        )
+        try {
+            getClient().execute(
+                KatHttp3Request(
+                    method = method,
+                    url = url,
+                    headers = headers.map { (name, value) -> KatHttp3Header(name, value) },
+                    body = body,
+                ),
+            )
+        } catch (t: Throwable) {
+            EchH3Diag.log(
+                "ECH/H3: transport error method=$method url=$url " +
+                    "err=${t.javaClass.simpleName}: ${t.message}",
+            )
+            throw t
+        }
     }
 
     suspend fun fetchImage(url: String): ByteArray {
