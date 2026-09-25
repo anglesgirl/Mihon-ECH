@@ -29,7 +29,7 @@ object KatHttp3State {
             override fun resolve(host: String, port: Int): List<dev.kathttp3.ResolvedAddress> {
                 val ech = EchDoh.echConfigList(host)
                 if (host.equals(PROBE_HOST, ignoreCase = true)) {
-                    check(!ech.isNullOrEmpty()) {
+                    check(ech != null && ech.isNotEmpty()) {
                         "DoH 未返回 $PROBE_HOST 的 ECH 配置，已阻止明文连接"
                     }
                 }
