@@ -50,6 +50,10 @@ dependencies {
     // JavaScript engine
     implementation(libs.quickJs)
 
+    // kathttp3 原生 ECH/H3 传输（替换 ech-proxy-go 本地代理）
+    // JitPack SNAPSHOT：default branch = main，jitpack.yml 已配置 Android 构建
+    implementation("com.github.anglesgirl:kathttp3-ech:main-SNAPSHOT")
+
     testImplementation(libs.bundles.test)
     testRuntimeOnly(libs.junit.platform.launcher)
 }

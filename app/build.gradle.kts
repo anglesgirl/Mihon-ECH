@@ -204,7 +204,9 @@ baselineProfile {
 }
 
 dependencies {
-    implementation(files("libs/echproxy.aar"))
+    // kathttp3 原生 ECH/H3（EchProxyManager 使用；与 core/common 同一依赖）
+    // JitPack SNAPSHOT：default branch = main，jitpack.yml 已配置 Android 构建
+    implementation("com.github.anglesgirl:kathttp3-ech:main-SNAPSHOT")
     baselineProfile(projects.baselineProfile)
 
     implementation(projects.i18n)

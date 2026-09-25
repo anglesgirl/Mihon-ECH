@@ -1,163 +1,122 @@
 package eu.kanade.tachiyomi.ech
 
 import android.content.Context
-import echproxy.Echproxy
+import dev.kathttp3.KatHttp3Client
+import dev.kathttp3.KatHttp3ClientConfig
+import eu.kanade.tachiyomi.network.CfEchResolver
+import eu.kanade.tachiyomi.network.ChannelDecision
 import eu.kanade.tachiyomi.network.EchProxyProvider
 import eu.kanade.tachiyomi.network.NetworkPreferences
 import logcat.LogPriority
 import tachiyomi.core.common.util.system.logcat
 import java.net.InetSocketAddress
-import java.net.ServerSocket
-import java.net.Socket
-import java.util.concurrent.Executors
+import java.util.concurrent.ConcurrentHashMap
 
 /**
- * Lifecycle and public configuration bridge for the shared ech-proxy-go
- * AAR. The proxy makes the final per-host choice: AS13335 targets receive ECH
- * (target HTTPS ech= first, then TXT fallback); all other targets use ordinary
- * TLS over DoH-resolved addresses.
+ * kathttp3 原生 ECH/H3 传输管理（替换原 ech-proxy-go 本地代理）。
+ *
+ * - 持有 KatHttp3Client 单例：DoH 解析 + 目标域名 ech / CF 官方活值兜底。
+ * - 通道判定缓存（域名 → DIRECT / KAT_HTTP3），失败驱动，进程内存态。
+ * - 保留 EchProxyProvider 接口语义与类名，App/DI/设置页无需改动。
  */
 class EchProxyManager(
     private val context: Context,
     private val preferences: NetworkPreferences,
 ) : EchProxyProvider {
-    @Volatile private var port: Int? = null
 
-    @Volatile private var activeConfig: Config? = null
-    private val executor = Executors.newSingleThreadExecutor()
+    @Volatile private var client: KatHttp3Client? = null
 
     @Volatile private var diagnostics: EchDiagnostics? = null
+
+    /** 域名 → 通道判定（进程内存；后续可持久化 + 云端共享）。 */
+    private val decisions = ConcurrentHashMap<String, ChannelDecision>()
+
+    override val enabled: Boolean
+        get() = preferences.echEnabled.get()
 
     fun setDiagnostics(value: EchDiagnostics) {
         diagnostics = value
     }
 
-    override val enabled: Boolean
-        get() = preferences.echEnabled.get()
-
     fun startAsync() {
-        diagnostics?.event("proxy_start_requested", "enabled=$enabled")
-        if (enabled) executor.execute { start() }
+        diagnostics?.event("ech_start_requested", "enabled=$enabled")
+        if (enabled) {
+            runCatching { ensureClient() }
+                .onFailure {
+                    diagnostics?.event("ech_init_failed", "error=${it.javaClass.simpleName}: ${it.message}")
+                    logcat(LogPriority.ERROR, it) { "ECH: kathttp3 init failed" }
+                }
+        }
     }
 
-    override fun shouldProxy(host: String): Boolean {
-        if (!enabled || host.isBlank()) return false
-        activeConfig ?: runCatching { fetchRemoteConfig() }
-            .onFailure {
-                diagnostic("bootstrap_failed", "host=$host error=${it.javaClass.simpleName}")
-                logcat(LogPriority.ERROR, it) { "ECH: could not load public configuration" }
+    private fun ensureClient(): KatHttp3Client? = synchronized(this) {
+        client ?: runCatching {
+            val dohEndpoints = preferences.echDohEndpoints.get()
+                .split(',')
+                .map(String::trim)
+                .filter { it.startsWith("https://") }
+            if (dohEndpoints.isEmpty()) {
+                diagnostics?.event("ech_init_failed", "reason=no_doh_endpoints")
+                logcat(LogPriority.WARN) { "ECH: no DoH endpoints configured" }
+                return@synchronized null
             }
-            .getOrElse { throw java.io.IOException("ECH public configuration unavailable", it) }
-            .also { activeConfig = it }
-        return true
-    }
-
-    @Synchronized
-    override fun start(): InetSocketAddress? {
-        port?.let { return InetSocketAddress("127.0.0.1", it) }
-        return runCatching {
-            val config = activeConfig ?: fetchRemoteConfig().also { activeConfig = it }
-            diagnostics?.event(
-                "proxy_config",
-                "doh_count=${config.doh.size} ip_count=${config.ips.split(',').count {
-                    it.isNotBlank()
-                }} ech_config=${config.echConfigList.isNotBlank()}",
-            )
-            val selectedPort = ServerSocket(0).use { it.localPort }
-            Echproxy.start(
-                "127.0.0.1:$selectedPort",
-                config.doh.joinToString(","),
-                context.filesDir.resolve("mihon-ech-public-config.json").absolutePath,
-                true,
-            )
-            awaitListener(selectedPort)
-            check(Echproxy.isRunning()) { "Go proxy stopped during startup" }
-            logcat(LogPriority.INFO) { "ECH: local proxy started on 127.0.0.1:$selectedPort" }
-            diagnostics?.event("proxy_started", "status=${Echproxy.lastStatus()} port=$selectedPort")
-            InetSocketAddress("127.0.0.1", selectedPort).also { port = selectedPort }
+            val resolver = CfEchResolver(dohEndpoints)
+            KatHttp3Client(
+                config = KatHttp3ClientConfig(
+                    resolver = resolver,
+                    connectTimeoutMillis = 8_000,
+                    handshakeTimeoutMillis = 8_000,
+                    readTimeoutMillis = 30_000,
+                    callTimeoutMillis = 60_000,
+                    followRedirects = true,
+                    maxRedirects = 5,
+                ),
+                applicationContext = context.applicationContext,
+            ).also { client = it }
         }.onFailure {
-            diagnostics?.event("proxy_start_failed", "error=${it.javaClass.simpleName}: ${it.message}")
-            logcat(LogPriority.ERROR, it) { "ECH: local proxy failed to start" }
+            diagnostics?.event("ech_init_failed", "error=${it.javaClass.simpleName}: ${it.message}")
+            logcat(LogPriority.ERROR, it) { "ECH: kathttp3 init failed" }
         }.getOrNull()
     }
 
-    @Synchronized
+    // ---- EchProxyProvider ----
+
+    override fun shouldProxy(host: String): Boolean = enabled && host.isNotBlank()
+
+    /** 旧方案（Go 本地代理端口）已废弃：返回 null，路由改为拦截器直调 kathttp3。 */
+    override fun start(): InetSocketAddress? = null
+
     override fun stop() {
-        runCatching { Echproxy.stop() }
-        port = null
-        activeConfig = null
+        synchronized(this) {
+            runCatching { client?.close() }
+            client = null
+            decisions.clear()
+        }
     }
 
-    @Synchronized
     override fun reload(): InetSocketAddress? {
         stop()
-        return if (enabled) start() else null
+        return null
     }
 
-    override fun status(): String = runCatching { Echproxy.lastStatus() }
-        .getOrDefault("ECH proxy is not running")
+    override fun status(): String =
+        if (client != null) "kathttp3 active" else "kathttp3 idle"
 
     override fun diagnostic(name: String, detail: String) {
         diagnostics?.event(name, detail)
-        if (name.endsWith("_failed") || name.endsWith("_refused")) {
-            diagnostics?.uploadNow()
-        }
     }
 
-    private fun fetchRemoteConfig(): Config {
-        val domain = preferences.echConfigDomain.get().trim().trimEnd('.')
-        val txt = domain.takeIf { it.isNotEmpty() }
-            ?.let { name -> runCatching { Echproxy.fetchBootstrapTxt(name) }.getOrNull() }
-            ?: run {
-                diagnostic("bootstrap_failed", "domain_configured=${domain.isNotEmpty()}")
-                throw IllegalStateException("ECH bootstrap TXT unavailable")
-            }
-        val values = txt.split(';', '\n').mapNotNull { item ->
-            val separator = item.indexOf('=')
-            item.takeIf { separator > 0 }?.let {
-                item.substring(0, separator).trim().lowercase() to item.substring(separator + 1).trim()
-            }
-        }.toMap()
-        val txtDohs = listOfNotNull(values["doh"], values["doh2"], values["doh3"])
-            .flatMap { it.split(',') }
-            .map(String::trim)
-            .filter { it.startsWith("https://") }
-        val configuredDohs = preferences.echDohEndpoints.get()
-            .split(',')
-            .map(String::trim)
-            .filter { it.startsWith("https://") }
-        // TXT is the live configuration source. Some bootstrap resolvers return
-        // a partial multi-string TXT response, however, so retain the user's
-        // validated ECH DoH endpoints as a fail-closed bootstrap fallback.
-        val dohs = txtDohs.ifEmpty { configuredDohs }
-        if (dohs.isEmpty()) {
-            diagnostic("bootstrap_failed", "reason=no_doh_endpoints")
-            throw IllegalStateException("ECH bootstrap has no usable DoH endpoints")
-        }
-        diagnostics?.event(
-            "bootstrap_loaded",
-            "source=${if (txtDohs.isEmpty()) "settings" else "txt"} doh_count=${dohs.size}",
-        )
-        return Config(
-            dohs,
-            values["ip"] ?: values["ips"] ?: preferences.echIpList.get().trim(),
-            values["ech"] ?: values["echconfig"] ?: "",
-        )
+    override fun katHttp3(): KatHttp3Client? = if (enabled) ensureClient() else null
+
+    override fun decision(host: String): ChannelDecision =
+        decisions.getOrDefault(host, ChannelDecision.UNKNOWN)
+
+    override fun recordDecision(host: String, decision: ChannelDecision) {
+        decisions[host] = decision
     }
 
-    private fun awaitListener(selectedPort: Int) {
-        val deadline = System.nanoTime() + 5_000_000_000L
-        var lastError: Throwable? = null
-        while (System.nanoTime() < deadline) {
-            runCatching {
-                Socket().use { socket ->
-                    socket.connect(InetSocketAddress("127.0.0.1", selectedPort), 250)
-                }
-            }.onSuccess { return }.onFailure { lastError = it }
-            Thread.sleep(100)
-        }
-        throw java.io.IOException("ECH local listener not ready", lastError)
+    override fun recordFailure(host: String) {
+        // 探测失败 → 后续直接走 kathttp3，不再反复 5s 探测
+        decisions[host] = ChannelDecision.KAT_HTTP3
     }
-
-    private data class Config(val doh: List<String>, val ips: String, val echConfigList: String)
 }

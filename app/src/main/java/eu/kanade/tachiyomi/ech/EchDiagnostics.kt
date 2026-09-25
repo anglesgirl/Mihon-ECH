@@ -2,8 +2,8 @@ package eu.kanade.tachiyomi.ech
 
 import android.content.Context
 import android.os.Build
-import echproxy.Echproxy
 import eu.kanade.tachiyomi.BuildConfig
+import eu.kanade.tachiyomi.network.EchProxyRegistry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -47,13 +47,12 @@ class EchDiagnostics(private val context: Context) {
     }
 
     private fun flushGoLogs() {
-        runCatching { Echproxy.diagnostics() }
-            .getOrNull()
-            ?.takeIf { it.isNotBlank() && it != lastGoSnapshot }
-            ?.let {
-                lastGoSnapshot = it
-                append("go", it.takeLast(12_000))
-            }
+        // Go 本地代理已由 kathttp3 替换：快照传输层状态即可
+        val status = EchProxyRegistry.provider?.status() ?: return
+        if (status.isNotBlank() && status != lastGoSnapshot) {
+            lastGoSnapshot = status
+            append("transport", status.takeLast(12_000))
+        }
     }
 
     private fun append(name: String, detail: String) {
