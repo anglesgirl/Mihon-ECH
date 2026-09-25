@@ -15,6 +15,7 @@ import eu.kanade.tachiyomi.extension.util.ExtensionLoader
 import eu.kanade.tachiyomi.util.system.toast
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -74,6 +75,13 @@ class ExtensionManager(
     init {
         initExtensions()
         ExtensionInstallReceiver(InstallationListener()).register(context)
+        // 覆盖安装主应用（尤其从 debug 包换到 release 包）后，首次全量扫描时部分扩展
+        // 可能因 dex 尚未完成 ART 编译/校验而加载失败（Error 被静默丢弃，表现为
+        // "已安装扩展不显示"）。延迟重扫一次让其自愈，无需用户重装扩展。
+        scope.launch {
+            delay(5_000)
+            initExtensions()
+        }
     }
 
     private var subLanguagesEnabledOnFirstRun = preferences.enabledLanguages.isSet()

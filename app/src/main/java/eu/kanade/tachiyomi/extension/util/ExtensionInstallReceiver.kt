@@ -11,6 +11,7 @@ import eu.kanade.tachiyomi.extension.model.Extension
 import eu.kanade.tachiyomi.extension.model.LoadResult
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import logcat.LogPriority
 import tachiyomi.core.common.util.system.logcat
@@ -54,7 +55,7 @@ internal class ExtensionInstallReceiver(private val listener: Listener) : Broadc
                     when (val result = getExtensionFromIntent(context, intent)) {
                         is LoadResult.Success -> listener.onExtensionInstalled(result.extension)
                         is LoadResult.Untrusted -> listener.onExtensionUntrusted(result.extension)
-                        else -> {}
+                        else -> retryLoad(context, intent)
                     }
                 }
             }
@@ -63,7 +64,7 @@ internal class ExtensionInstallReceiver(private val listener: Listener) : Broadc
                     when (val result = getExtensionFromIntent(context, intent)) {
                         is LoadResult.Success -> listener.onExtensionUpdated(result.extension)
                         is LoadResult.Untrusted -> listener.onExtensionUntrusted(result.extension)
-                        else -> {}
+                        else -> retryLoad(context, intent)
                     }
                 }
             }
@@ -73,6 +74,31 @@ internal class ExtensionInstallReceiver(private val listener: Listener) : Broadc
                 val pkgName = getPackageNameFromIntent(intent)
                 if (pkgName != null) {
                     listener.onPackageUninstalled(pkgName)
+                }
+            }
+        }
+    }
+
+    /**
+     * 新安装的扩展 APK 在广播到达瞬间，dex 可能尚未完成 ART 编译/校验，
+     * [ExtensionLoader.loadExtensionFromPkgName] 会返回 [LoadResult.Error] 且被上层静默丢弃
+     * （表现为"安装两次才显示"）。这里延迟重试数次，等 dex 就绪后再加载。
+     */
+    private suspend fun retryLoad(context: Context, intent: Intent?) {
+        val pkgName = getPackageNameFromIntent(intent)
+        repeat(3) { attempt ->
+            delay(1500L * (attempt + 1))
+            when (val result = getExtensionFromIntent(context, intent)) {
+                is LoadResult.Success -> {
+                    listener.onExtensionInstalled(result.extension)
+                    return
+                }
+                is LoadResult.Untrusted -> {
+                    listener.onExtensionUntrusted(result.extension)
+                    return
+                }
+                else -> logcat(LogPriority.WARN) {
+                    "Extension load failed for $pkgName, retry ${attempt + 1}/3"
                 }
             }
         }
