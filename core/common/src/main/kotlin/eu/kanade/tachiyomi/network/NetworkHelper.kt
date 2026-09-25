@@ -2,6 +2,7 @@ package eu.kanade.tachiyomi.network
 
 import android.content.Context
 import com.anglesgirl.echsdk.EchSdk
+import eu.kanade.tachiyomi.network.interceptor.CloudflareH3Interceptor
 import eu.kanade.tachiyomi.network.interceptor.CloudflareInterceptor
 import eu.kanade.tachiyomi.network.interceptor.UncaughtExceptionInterceptor
 import eu.kanade.tachiyomi.network.interceptor.UserAgentInterceptor
@@ -59,7 +60,7 @@ class NetworkHelper(
         }
 
         // ECH 已在后台初始化；失败则沿用宿主默认网络客户端。
-        if (EchSdkState.enabled) builder.also(EchSdk::configure)
+        if (EchSdkState.enabled) EchSdk.configure(builder)
         builder
     }
 
