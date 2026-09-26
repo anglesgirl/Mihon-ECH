@@ -106,7 +106,8 @@ class CloudflareH3Interceptor(
         // Cloudflare（走 ECH）+ GitHub/Fastly/CDN 系列（明文 H3）：
         // 这些 CDN 都支持 HTTP/3，且明文 H3 走 UDP 不受 TCP RST 阻断
         val isCloudflare = EchDoh.isCloudflareHost(host)
-        val isH3Cdn = host == "raw.githubusercontent.com" ||
+        val isH3Cdn = host == "github.com" ||
+            host == "raw.githubusercontent.com" ||
             host.endsWith(".github.com") ||
             host.endsWith("githubusercontent.com") ||
             host.endsWith(".github.io") ||
