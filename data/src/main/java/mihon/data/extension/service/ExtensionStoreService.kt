@@ -12,6 +12,7 @@ import logcat.LogPriority
 import mihon.data.extension.model.NetworkExtensionStore
 import mihon.data.extension.model.NetworkLegacyExtension
 import mihon.data.extension.model.NetworkLegacyExtensionRepo
+import mihon.data.extension.model.mirrorToRawGithub
 import mihon.data.extension.model.toAvailableExtensions
 import mihon.domain.extension.model.ExtensionStore
 import okio.BufferedSource
@@ -52,7 +53,7 @@ class ExtensionStoreService(
 
                 if (networkStore is NetworkLegacyExtensionRepo && networkStore.indexV2 != null) {
                     // github.com 在部分网络下 H3/TCP 均不可达，改用 jsdelivr 镜像（走 CF ECH/H3）
-                    return fetch(mirrorToJsDelivr(networkStore.indexV2))
+                    return fetch(mirrorToRawGithub(networkStore.indexV2))
                 }
 
                 networkStore.toExtensionStore(updatedIndexUrl)
@@ -66,33 +67,6 @@ class ExtensionStoreService(
             }
             Result.failure(e)
         }
-    }
-
-    /**
-     * GitHub raw URL → jsdelivr 镜像：
-     * https://github.com/{owner}/{repo}/raw/{branch}/{path}
-     *   → https://cdn.jsdelivr.net/gh/{owner}/{repo}@{branch}/{path}
-     * github.com 在部分网络下 H3/TCP 均不可达，jsdelivr 走 Cloudflare ECH/H3。
-     */
-    private fun mirrorToJsDelivr(url: String): String {
-        val prefix = "https://github.com/"
-        if (!url.startsWith(prefix)) return url
-        val rest = url.removePrefix(prefix)
-        val ownerEnd = rest.indexOf('/')
-        if (ownerEnd <= 0) return url
-        val owner = rest.substring(0, ownerEnd)
-        val afterOwner = rest.substring(ownerEnd + 1)
-        val repoEnd = afterOwner.indexOf('/')
-        if (repoEnd <= 0) return url
-        val repo = afterOwner.substring(0, repoEnd)
-        val afterRepo = afterOwner.substring(repoEnd + 1)
-        if (!afterRepo.startsWith("raw/")) return url
-        val path = afterRepo.removePrefix("raw/")
-        val branchEnd = path.indexOf('/')
-        if (branchEnd <= 0) return url
-        val branch = path.substring(0, branchEnd)
-        val filePath = path.substring(branchEnd + 1)
-        return "https://cdn.jsdelivr.net/gh/$owner/$repo@$branch/$filePath"
     }
 
     suspend fun getExtensions(store: ExtensionStore): Result<List<Extension.Available>> {
