@@ -102,7 +102,18 @@ class CloudflareH3Interceptor(
         if (request.header("Authorization") != null) return false
         if (request.header("Range") != null) return false
         if (request.url.scheme != "https") return false
-        if (!EchDoh.isCloudflareHost(request.url.host)) return false
+        val host = request.url.host
+        // Cloudflare（走 ECH）+ GitHub/Fastly/CDN 系列（明文 H3）：
+        // 这些 CDN 都支持 HTTP/3，且明文 H3 走 UDP 不受 TCP RST 阻断
+        val isCloudflare = EchDoh.isCloudflareHost(host)
+        val isH3Cdn = host == "raw.githubusercontent.com" ||
+            host.endsWith(".github.com") ||
+            host.endsWith("githubusercontent.com") ||
+            host.endsWith(".github.io") ||
+            host.endsWith("githubassets.com") ||
+            host.endsWith(".jsdelivr.net") ||
+            host.endsWith(".fastly.net")
+        if (!isCloudflare && !isH3Cdn) return false
         val body = request.body ?: return request.method != "POST"
         return body.contentLength() in 0..(2L * 1024 * 1024)
     }
