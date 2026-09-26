@@ -12,7 +12,7 @@ import logcat.LogPriority
 import mihon.data.extension.model.NetworkExtensionStore
 import mihon.data.extension.model.NetworkLegacyExtension
 import mihon.data.extension.model.NetworkLegacyExtensionRepo
-import mihon.data.extension.model.mirrorToRawGithub
+import mihon.data.extension.model.mirrorToCloudflare
 import mihon.data.extension.model.toAvailableExtensions
 import mihon.domain.extension.model.ExtensionStore
 import okio.BufferedSource
@@ -53,7 +53,7 @@ class ExtensionStoreService(
 
                 if (networkStore is NetworkLegacyExtensionRepo && networkStore.indexV2 != null) {
                     // github.com 在部分网络下 H3/TCP 均不可达，改用 jsdelivr 镜像（走 CF ECH/H3）
-                    return fetch(mirrorToRawGithub(networkStore.indexV2))
+                    return fetch(mirrorToCloudflare(networkStore.indexV2))
                 }
 
                 networkStore.toExtensionStore(updatedIndexUrl)

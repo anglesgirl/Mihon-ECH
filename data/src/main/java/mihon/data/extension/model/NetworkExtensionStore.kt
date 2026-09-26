@@ -98,11 +98,11 @@ fun ExtensionList.toAvailableExtensions(store: ExtensionStore): List<TachiyomiEx
         TachiyomiExtension.Available(
             name = extension.name,
             pkgName = extension.packageName,
-            // keiyoushi index.pb 的资源 URL 指向 github.com / cdn.jsdelivr.net，
-            // 前者 H3/TCP 均不可达，后者对冷文件 301 回 raw.githubusercontent.com。
-            // 统一改写为 raw.githubusercontent.com（Fastly，明文 H3 通道直连）。
-            apkUrl = mirrorToRawGithub(extension.resources.apkUrl),
-            iconUrl = mirrorToRawGithub(extension.resources.iconUrl),
+            // keiyoushi index.pb 的资源 URL 若指向 github.com（H3/TCP 均不可达），
+            // 改写到 cdn.jsdelivr.net（Cloudflare，走 ECH/H3 通道）；
+            // 已是 cdn.jsdelivr.net 的 URL 原样保留。不切换到 Fastly（raw.githubusercontent.com）。
+            apkUrl = mirrorToCloudflare(extension.resources.apkUrl),
+            iconUrl = mirrorToCloudflare(extension.resources.iconUrl),
             libVersion = extension.extensionLib.toDouble(),
             versionCode = extension.versionCode,
             versionName = extension.versionName,
@@ -122,45 +122,29 @@ fun ExtensionList.toAvailableExtensions(store: ExtensionStore): List<TachiyomiEx
 }
 
 /**
- * 将 keiyoushi 资源 URL 改写为 raw.githubusercontent.com（Fastly CDN，明文 H3 通道直连）：
+ * 将 github.com 资源 URL 改写为 cdn.jsdelivr.net（Cloudflare，ECH/H3 通道）：
  * - https://github.com/{owner}/{repo}/raw/{branch}/{path}
- *     → https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{path}
- * - https://cdn.jsdelivr.net/gh/{owner}/{repo}@{branch}/{path}
- *     → https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{path}
- * 其他地址原样返回。原因：github.com 的 H3/TCP 均不可达；
- * jsdelivr 对 keiyoushi 冷资源（apk/图标）一律 301 回 raw.githubusercontent.com，
- * 直接改写可跳过两座断桥。
+ *     → https://cdn.jsdelivr.net/gh/{owner}/{repo}@{branch}/{path}
+ * 已是 cdn.jsdelivr.net 或其他地址的 URL 原样返回。
+ * 注意：不要改写为 raw.githubusercontent.com（Fastly，不支持 HTTP/3）。
  */
-internal fun mirrorToRawGithub(url: String): String {
-    // github.com/{owner}/{repo}/raw/{branch}/{path}
+internal fun mirrorToCloudflare(url: String): String {
     val ghPrefix = "https://github.com/"
-    if (url.startsWith(ghPrefix)) {
-        val rest = url.removePrefix(ghPrefix)
-        val ownerEnd = rest.indexOf('/')
-        if (ownerEnd <= 0) return url
-        val owner = rest.substring(0, ownerEnd)
-        val afterOwner = rest.substring(ownerEnd + 1)
-        val repoEnd = afterOwner.indexOf('/')
-        if (repoEnd <= 0) return url
-        val repo = afterOwner.substring(0, repoEnd)
-        val afterRepo = afterOwner.substring(repoEnd + 1)
-        if (!afterRepo.startsWith("raw/")) return url
-        val branchPath = afterRepo.removePrefix("raw/")
-        return "https://raw.githubusercontent.com/$owner/$repo/$branchPath"
-    }
-    // cdn.jsdelivr.net/gh/{owner}/{repo}@{branch}/{path}
-    val jdPrefix = "https://cdn.jsdelivr.net/gh/"
-    if (url.startsWith(jdPrefix)) {
-        val rest = url.removePrefix(jdPrefix)
-        val ownerEnd = rest.indexOf('/')
-        if (ownerEnd <= 0) return url
-        val owner = rest.substring(0, ownerEnd)
-        val afterOwner = rest.substring(ownerEnd + 1)
-        val at = afterOwner.indexOf('@')
-        if (at <= 0) return url
-        val repo = afterOwner.substring(0, at)
-        val branchPath = afterOwner.substring(at + 1)
-        return "https://raw.githubusercontent.com/$owner/$repo/$branchPath"
-    }
-    return url
+    if (!url.startsWith(ghPrefix)) return url
+    val rest = url.removePrefix(ghPrefix)
+    val ownerEnd = rest.indexOf('/')
+    if (ownerEnd <= 0) return url
+    val owner = rest.substring(0, ownerEnd)
+    val afterOwner = rest.substring(ownerEnd + 1)
+    val repoEnd = afterOwner.indexOf('/')
+    if (repoEnd <= 0) return url
+    val repo = afterOwner.substring(0, repoEnd)
+    val afterRepo = afterOwner.substring(repoEnd + 1)
+    if (!afterRepo.startsWith("raw/")) return url
+    val branchPath = afterRepo.removePrefix("raw/")
+    val branchEnd = branchPath.indexOf('/')
+    if (branchEnd <= 0) return url
+    val branch = branchPath.substring(0, branchEnd)
+    val filePath = branchPath.substring(branchEnd + 1)
+    return "https://cdn.jsdelivr.net/gh/$owner/$repo@$branch/$filePath"
 }
