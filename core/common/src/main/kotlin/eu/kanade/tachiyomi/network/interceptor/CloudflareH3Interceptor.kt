@@ -14,11 +14,20 @@ import okhttp3.Response
 import okhttp3.ResponseBody.Companion.toResponseBody
 import okio.Buffer
 import java.io.IOException
+import java.util.concurrent.Semaphore
+import java.util.concurrent.TimeUnit
 
-/** H3优先处理无登录态的 Cloudflare GET/HEAD；失败沿用 OkHttp。 */
+/**
+ * H3 优先处理无登录态的 Cloudflare GET/HEAD；失败沿用 OkHttp。
+ * 并发信号量限制同时 in-flight 的 H3 握手数，避免 CF 边缘对
+ * 同一 IP 大量并发 QUIC 握手限流（表现为 Handshake timed out / TLS handshake error）。
+ */
 class CloudflareH3Interceptor(
     private val cookieJar: AndroidCookieJar,
 ) : Interceptor {
+
+    private val h3Semaphore = Semaphore(4)
+
     override fun intercept(chain: Interceptor.Chain): Response {
         val request = chain.request()
         if (!shouldUseH3(request)) {
@@ -26,6 +35,19 @@ class CloudflareH3Interceptor(
             return chain.proceed(request)
         }
 
+        // 并发握手已满（2 秒内无空闲许可）→ 直接走 OkHttp，避免在 H3 队列里干等超时
+        if (!h3Semaphore.tryAcquire(2, TimeUnit.SECONDS)) {
+            EchH3Diag.log("ECH/H3: busy fallback url=${request.url}")
+            return chain.proceed(request)
+        }
+        try {
+            return tryIntercept(chain, request)
+        } finally {
+            h3Semaphore.release()
+        }
+    }
+
+    private fun tryIntercept(chain: Interceptor.Chain, request: Request): Response {
         val requestHeaders = request.headers.toMultimap().flatMap { (name, values) ->
             values.map { name to it }
         }.toMutableList()
@@ -108,7 +130,6 @@ class CloudflareH3Interceptor(
         val isCloudflare = EchDoh.isCloudflareHost(host)
         val isH3Cdn = host == "github.com" ||
             host == "raw.githubusercontent.com" ||
-            host.endsWith(".github.com") ||
             host.endsWith("githubusercontent.com") ||
             host.endsWith(".github.io") ||
             host.endsWith("githubassets.com") ||
