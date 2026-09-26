@@ -26,7 +26,12 @@ class ExtensionStoreService(
     private val json: Json,
     private val protoBuf: ProtoBuf,
 ) {
-    suspend fun fetch(indexUrl: String): Result<ExtensionStore> {
+    suspend fun fetch(indexUrl: String, depth: Int = 0): Result<ExtensionStore> {
+        // 防止 legacy repo 的 indexV2 经 mirrorToCloudflare 改写后内容不变
+        // （镜像内容仍指向原地址）导致同 URL 无限递归请求
+        if (depth > 1) {
+            return Result.failure(IllegalStateException("Extension store URL redirect loop"))
+        }
         var updatedIndexUrl: String = indexUrl
         return try {
             val response = network.client.newCall(GET(updatedIndexUrl)).awaitSuccess()
@@ -53,7 +58,7 @@ class ExtensionStoreService(
 
                 if (networkStore is NetworkLegacyExtensionRepo && networkStore.indexV2 != null) {
                     // github.com 在部分网络下 H3/TCP 均不可达，改用 jsdelivr 镜像（走 CF ECH/H3）
-                    return fetch(mirrorToCloudflare(networkStore.indexV2))
+                    return fetch(mirrorToCloudflare(networkStore.indexV2), depth + 1)
                 }
 
                 networkStore.toExtensionStore(updatedIndexUrl)

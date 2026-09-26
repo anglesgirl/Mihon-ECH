@@ -4,6 +4,7 @@ import com.anglesgirl.echsdk.EchDoh
 import eu.kanade.tachiyomi.network.AndroidCookieJar
 import eu.kanade.tachiyomi.network.EchH3Diag
 import eu.kanade.tachiyomi.network.KatHttp3State
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import okhttp3.Headers
 import okhttp3.Interceptor
@@ -78,6 +79,11 @@ class CloudflareH3Interceptor(
                 )
             }
         } catch (error: Exception) {
+            if (error is CancellationException) {
+                // OkHttp 超时/取消会中断 runBlocking 所在线程；此时线程已
+                // 被打断，fallback 大概率立即失败，直接向上抛，避免双重延迟
+                throw error
+            }
             EchH3Diag.log(
                 "ECH/H3: transport fail url=${request.url} method=${request.method} " +
                     "err=${error.javaClass.simpleName}: ${error.message}",
