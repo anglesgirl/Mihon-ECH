@@ -30,7 +30,7 @@ android {
     namespace = "eu.kanade.tachiyomi"
 
     defaultConfig {
-        applicationId = "app.mihon"
+        applicationId = "com.anglesgirl.mihonech"
 
         versionCode = providers.gradleProperty("appVersionCode").orElse("26").get().toInt()
         versionName = providers.gradleProperty("appVersionName").orElse("0.20.1").get()

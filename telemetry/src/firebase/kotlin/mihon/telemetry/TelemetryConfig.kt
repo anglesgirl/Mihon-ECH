@@ -14,7 +14,8 @@ object TelemetryConfig {
     private var crashlytics: FirebaseCrashlytics? = null
 
     fun init(context: Context) {
-        // To stop forks/test builds from polluting our data
+        // 数据上报到本项目自己的 Firebase（mihon-ech）。只对当前项目包名启用，
+        // 避免其它签名/其它分支的测试包污染统计数据。
         if (!context.isMihonProductionApp()) return
 
         // Check if Google Play Services is available before initializing Firebase
@@ -52,15 +53,13 @@ object TelemetryConfig {
         crashlytics?.isCrashlyticsCollectionEnabled = enabled
     }
 
-    private fun Context.isMihonProductionApp(): Boolean {
-        if (packageName !in MIHON_PACKAGES) return false
-
-        return packageManager.getPackageInfo(packageName, SignatureFlags)
-            .getCertificateFingerprints()
-            .any { it == MIHON_CERTIFICATE_FINGERPRINT }
-    }
+    private fun Context.isMihonProductionApp(): Boolean = packageName in MIHON_PACKAGES
 }
 
-private val MIHON_PACKAGES = hashSetOf("app.mihon", "app.mihon.debug")
-private const val MIHON_CERTIFICATE_FINGERPRINT =
-    "9A:DD:65:5A:78:E9:6C:4E:C7:A5:3E:F8:9D:CC:B5:57:CB:5D:76:74:89:FA:C5:E7:85:D6:71:A5:A7:5D:4D:A2"
+/* 本项目的包名白名单：release 主包 + preview（.debug 后缀）变体。
+ * 原版按官方签名指纹过滤，数据归自己后不再需要指纹校验；
+ * 包名是新注册的，只有本项目的构建才会命中。 */
+private val MIHON_PACKAGES = hashSetOf(
+    "com.anglesgirl.mihonech",
+    "com.anglesgirl.mihonech.debug",
+)
