@@ -42,8 +42,10 @@ class NetworkHelper(
             .addInterceptor(UserAgentInterceptor(::defaultUserAgentProvider))
             // Keep the original URL visible to CloudflareInterceptor so its
             // WebView challenge flow can open the real host. ECH routing must
-            // be the final application interceptor before the network call.
+            // be the final application interceptor before the network call, so
+            // the release mirror sits between Cloudflare and ECH routing.
             .addInterceptor(CloudflareInterceptor(context, cookieJar, scope, ::defaultUserAgentProvider))
+            .addInterceptor(GithubReleaseMirrorInterceptor())
             .addInterceptor(EchRoutingInterceptor())
 
         if (preferences.verboseLogging.get()) {
