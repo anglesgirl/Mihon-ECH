@@ -53,7 +53,7 @@ class EchRoutingInterceptor(
 
         when (provider.decision(host)) {
             ChannelDecision.DIRECT -> return chain.proceed(request)
-            ChannelDecision.KAT_HTTP3 -> return viaKatHttp3(k3, request, host)
+            ChannelDecision.KAT_HTTP3 -> return viaKatHttp3(provider, k3, request, host)
             ChannelDecision.UNKNOWN -> Unit
         }
 
@@ -66,10 +66,11 @@ class EchRoutingInterceptor(
             return probe.getOrThrow()
         }
         provider.recordFailure(host)
-        return viaKatHttp3(k3, request, host)
+        return viaKatHttp3(provider, k3, request, host)
     }
 
     private fun viaKatHttp3(
+        provider: EchProxyProvider,
         k3: KatHttp3Client,
         request: okhttp3.Request,
         host: String,
