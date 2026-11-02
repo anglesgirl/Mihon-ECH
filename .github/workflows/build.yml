@@ -84,7 +84,16 @@ jobs:
           name: test-report-${{ github.sha }}
           path: app/build/reports/tests/testDebugUnitTest
 
+      - name: Decode release keystore
+        run: echo "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" | base64 -d > "${{ runner.temp }}/release.keystore"
+
       - name: Build app
+        env:
+          MIHON_GITHUB_RELEASE: "true"
+          storeFile: ${{ runner.temp }}/release.keystore
+          storePassword: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          keyAlias: ${{ secrets.RELEASE_KEY_ALIAS }}
+          keyPassword: ${{ secrets.RELEASE_KEY_PASSWORD }}
         run: ./gradlew assembleRelease -Pdist=ci
 
       - name: Upload APK
