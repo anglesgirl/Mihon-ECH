@@ -46,7 +46,9 @@ class ExtensionStoreService(
                 val networkStore = when (source.peek().readByte()) {
                     // "[..."
                     0x5B.toByte() -> run {
-                        logcat(LogPriority.INFO) { "ExtStore: format=json-array (legacy index.min.json) url=$updatedIndexUrl" }
+                        logcat(LogPriority.INFO) {
+                            "ExtStore: format=json-array (legacy index.min.json) url=$updatedIndexUrl"
+                        }
                         if (!indexUrl.endsWith("/index.min.json")) {
                             throw IllegalArgumentException("Provided legacy store url is not valid")
                         }
@@ -80,7 +82,8 @@ class ExtensionStoreService(
             }
             logcat(LogPriority.INFO) {
                 "ExtStore: fetch done name=${store.name} indexUrl=${store.indexUrl} " +
-                    "extensionListUrl=${store.extensionListUrl} isLegacy=${store.isLegacy} signingKey=${store.signingKey}"
+                    "extensionListUrl=${store.extensionListUrl} isLegacy=${store.isLegacy} " +
+                    "signingKey=${store.signingKey}"
             }
             Result.success(store)
         } catch (e: CancellationException) {
