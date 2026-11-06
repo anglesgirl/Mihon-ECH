@@ -63,13 +63,15 @@ class GithubReleaseMirrorInterceptor : Interceptor {
             return false
         }
         return when (segments[2]) {
-            "releases" -> segments.size >= 6 &&
-                segments[3] == "download" &&
-                segments[4].isNotEmpty() &&
-                segments[5].isNotEmpty()
-            "raw" -> segments.size >= 5 &&
-                segments[3].isNotEmpty() &&
-                segments[4].isNotEmpty()
+            "releases" ->
+                segments.size >= 6 &&
+                    segments[3] == "download" &&
+                    segments[4].isNotEmpty() &&
+                    segments[5].isNotEmpty()
+            "raw" ->
+                segments.size >= 5 &&
+                    segments[3].isNotEmpty() &&
+                    segments[4].isNotEmpty()
             else -> false
         }
     }
