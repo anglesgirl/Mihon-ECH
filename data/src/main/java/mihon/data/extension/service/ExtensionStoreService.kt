@@ -37,40 +37,57 @@ class ExtensionStoreService(
     private suspend fun fetchStore(indexUrl: String): Result<ExtensionStore> {
         var updatedIndexUrl: String = indexUrl
         return try {
+            logcat(LogPriority.INFO) { "ExtStore: fetch start url=$updatedIndexUrl" }
             val response = network.client.newCall(GET(updatedIndexUrl)).awaitSuccess()
+            logcat(LogPriority.INFO) {
+                "ExtStore: fetch ok url=$updatedIndexUrl code=${response.code} finalUrl=${response.request.url}"
+            }
             val store = response.body.source().decompressIfGzipped().use { source ->
                 val networkStore = when (source.peek().readByte()) {
                     // "[..."
                     0x5B.toByte() -> run {
+                        logcat(LogPriority.INFO) { "ExtStore: format=json-array (legacy index.min.json) url=$updatedIndexUrl" }
                         if (!indexUrl.endsWith("/index.min.json")) {
                             throw IllegalArgumentException("Provided legacy store url is not valid")
                         }
                         updatedIndexUrl = indexUrl.replace("/index.min.json", "/repo.json")
+                        logcat(LogPriority.INFO) { "ExtStore: fetch repo.json url=$updatedIndexUrl" }
                         network.client.newCall(GET(updatedIndexUrl)).awaitSuccess().body.source().use {
                             json.decodeFromBufferedSource<NetworkLegacyExtensionRepo>(it)
                         }
                     }
                     // "{..."
                     0x7B.toByte() -> try {
+                        logcat(LogPriority.INFO) { "ExtStore: format=json-object url=$updatedIndexUrl" }
                         json.decodeFromBufferedSource<NetworkLegacyExtensionRepo>(source.peek())
                     } catch (_: IllegalArgumentException) {
                         json.decodeFromBufferedSource<NetworkExtensionStore>(source)
                     }
-                    else -> protoBuf.decodeFromByteArray<NetworkExtensionStore>(source.readByteArray())
+                    else -> {
+                        logcat(LogPriority.INFO) { "ExtStore: format=protobuf (index.pb) url=$updatedIndexUrl" }
+                        protoBuf.decodeFromByteArray<NetworkExtensionStore>(source.readByteArray())
+                    }
                 }
 
                 if (networkStore is NetworkLegacyExtensionRepo && networkStore.indexV2 != null) {
+                    logcat(LogPriority.INFO) {
+                        "ExtStore: indexV2 redirect from=$updatedIndexUrl to=${networkStore.indexV2}"
+                    }
                     return fetchStore(networkStore.indexV2)
                 }
 
                 networkStore.toExtensionStore(updatedIndexUrl)
+            }
+            logcat(LogPriority.INFO) {
+                "ExtStore: fetch done name=${store.name} indexUrl=${store.indexUrl} " +
+                    "extensionListUrl=${store.extensionListUrl} isLegacy=${store.isLegacy} signingKey=${store.signingKey}"
             }
             Result.success(store)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             logcat(LogPriority.ERROR, e) {
-                "Failed to add extension store '$updatedIndexUrl'"
+                "ExtStore: fetch failed url=$updatedIndexUrl error=${e.message}"
             }
             Result.failure(e)
         }
@@ -79,6 +96,9 @@ class ExtensionStoreService(
     suspend fun getExtensions(store: ExtensionStore): Result<List<Extension.Available>> = withContext(Dispatchers.IO) {
         try {
             val extensions = if (store.extensionListUrl != null) {
+                logcat(LogPriority.INFO) {
+                    "ExtStore: getExtensions via extensionListUrl store=${store.name} url=${store.extensionListUrl}"
+                }
                 val response = network.client.newCall(GET(store.extensionListUrl!!)).awaitSuccess()
                 response.body.source().decompressIfGzipped().use { source ->
                     when (source.peek().readByte()) {
@@ -91,6 +111,9 @@ class ExtensionStoreService(
                         .toAvailableExtensions(store)
                 }
             } else if (!store.isLegacy) {
+                logcat(LogPriority.INFO) {
+                    "ExtStore: getExtensions via indexUrl store=${store.name} url=${store.indexUrl}"
+                }
                 val response = network.client.newCall(GET(store.indexUrl)).awaitSuccess()
                 response.body.source().decompressIfGzipped().use { source ->
                     when (source.peek().readByte()) {
@@ -103,16 +126,26 @@ class ExtensionStoreService(
                 }
             } else {
                 val storeBaseUrl = store.indexUrl.removeSuffix("/repo.json")
+                logcat(LogPriority.INFO) {
+                    "ExtStore: getExtensions via legacy index.min.json store=${store.name} base=$storeBaseUrl"
+                }
                 val response = network.client.newCall(GET("$storeBaseUrl/index.min.json")).awaitSuccess()
                 response.body.source().use { source ->
                     json.decodeFromBufferedSource<List<NetworkLegacyExtension>>(source)
                         .map { it.toAvailableExtension(store, storeBaseUrl) }
                 }
             }
+            logcat(LogPriority.INFO) {
+                "ExtStore: getExtensions done store=${store.name} count=${extensions.size}"
+            }
             Result.success(extensions)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
+            logcat(LogPriority.ERROR, e) {
+                "ExtStore: getExtensions failed store=${store.name} indexUrl=${store.indexUrl} " +
+                    "extensionListUrl=${store.extensionListUrl} error=${e.message}"
+            }
             Result.failure(e)
         }
     }

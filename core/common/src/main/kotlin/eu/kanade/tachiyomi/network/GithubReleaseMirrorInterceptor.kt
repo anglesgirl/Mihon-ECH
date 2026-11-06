@@ -34,6 +34,9 @@ class GithubReleaseMirrorInterceptor : Interceptor {
         val mirrored = request.newBuilder()
             .url(request.url.newBuilder().host(MIRROR_HOST).build())
             .build()
+        logcat(LogPriority.INFO) {
+            "Mirror: rewrite github.com -> $MIRROR_HOST url=${request.url} mirrored=${mirrored.url}"
+        }
         try {
             val response = chain.proceed(mirrored)
             if (response.isSuccessful) {
