@@ -9,6 +9,9 @@ on:
 
 jobs:
   update_website:
+    # Fork has no token for the upstream mihonapp/website repo: every fork
+    # release failed here with 401 Bad credentials. Upstream-only.
+    if: github.repository == 'mihonapp/mihon'
     runs-on: 'ubuntu-26.04'
 
     steps:
