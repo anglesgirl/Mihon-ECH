@@ -57,6 +57,23 @@ class ExtensionStoreService(
         return "https://gh.anglesya.win/keiyoushi/extensions/raw/repo/" + indexUrl.removePrefix(prefix)
     }
 
+    /**
+     * Same rewrite rule as GithubReleaseMirrorInterceptor, applied to the
+     * stored address: a github.com /<owner>/<repo>/raw/... URL becomes the
+     * mirror URL, so the store entry itself points at the mirror instead of
+     * only being rewritten per-request. Returns null when the URL is not a
+     * mirrorable GitHub raw URL.
+     */
+    private fun githubRawToMirror(url: String): String? {
+        val path = url.removePrefix("https://github.com/")
+        if (path == url) return null
+        val segments = path.split("/")
+        if (segments.size < 5 || segments[2] != "raw" || segments[3].isEmpty() || segments[4].isEmpty()) {
+            return null
+        }
+        return "https://gh.anglesya.win/$path"
+    }
+
     private suspend fun fetchStoreOnce(indexUrl: String): Result<ExtensionStore> {
         var updatedIndexUrl: String = indexUrl
         return try {
@@ -95,10 +112,25 @@ class ExtensionStoreService(
                 }
 
                 if (networkStore is NetworkLegacyExtensionRepo && networkStore.indexV2 != null) {
-                    logcat(LogPriority.INFO) {
-                        "ExtStore: indexV2 redirect from=$updatedIndexUrl to=${networkStore.indexV2}"
+                    val redirectUrl = networkStore.indexV2
+                    val mirroredUrl = githubRawToMirror(redirectUrl)
+                    if (mirroredUrl != null) {
+                        logcat(LogPriority.INFO) {
+                            "ExtStore: indexV2 redirect from=$updatedIndexUrl to=$redirectUrl " +
+                                "mirrored=$mirroredUrl"
+                        }
+                        val mirrored = fetchStoreOnce(mirroredUrl)
+                        if (mirrored.isSuccess) return mirrored
+                        logcat(LogPriority.INFO) {
+                            "ExtStore: mirrored indexV2 fetch failed, retry original url=$redirectUrl " +
+                                "error=${mirrored.exceptionOrNull()?.message}"
+                        }
+                    } else {
+                        logcat(LogPriority.INFO) {
+                            "ExtStore: indexV2 redirect from=$updatedIndexUrl to=$redirectUrl"
+                        }
                     }
-                    return fetchStoreOnce(networkStore.indexV2)
+                    return fetchStoreOnce(redirectUrl)
                 }
 
                 networkStore.toExtensionStore(updatedIndexUrl)

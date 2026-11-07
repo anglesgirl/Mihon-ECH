@@ -20,7 +20,9 @@ import tachiyomi.core.common.util.system.logcat
  * store table stays empty (2026-11-07 echfix3 log). A successful insert
  * stores the index.pb URL (after the repo.json indexV2 redirect), not the
  * index.min.json URL it was fetched from, so presence is checked against
- * both.
+ * both. The stored URL is the mirror address: the interceptor already
+ * rewrote github.com fetches to the mirror per-request, but the entry
+ * itself still showed github.com (echfix4), so it is rewritten here too.
  */
 @Inject
 @ContributesIntoSet(AppScope::class)
@@ -33,6 +35,7 @@ class DefaultExtensionStoreMigration(
         val indexUrl = "https://gh.anglesya.win/keiyoushi/extensions/raw/repo/index.min.json"
         val legacyIndexUrl = "https://cdn.jsdelivr.net/gh/keiyoushi/extensions@repo/index.min.json"
         val resolvedIndexUrl = "https://github.com/keiyoushi/extensions/raw/repo/index.pb"
+        val resolvedMirrorIndexUrl = "https://gh.anglesya.win/keiyoushi/extensions/raw/repo/index.pb"
 
         val existing = repository.getAll()
         logcat(LogPriority.INFO) {
@@ -42,7 +45,18 @@ class DefaultExtensionStoreMigration(
             logcat(LogPriority.INFO) { "ExtStore: migration remove legacy jsDelivr store url=$legacyIndexUrl" }
             repository.remove(legacyIndexUrl)
         }
-        val alreadyPresent = existing.any { it.indexUrl == indexUrl || it.indexUrl == resolvedIndexUrl }
+        val githubStore = existing.firstOrNull { it.indexUrl == resolvedIndexUrl }
+        if (githubStore != null) {
+            logcat(LogPriority.INFO) {
+                "ExtStore: migration rewrite store url=$resolvedIndexUrl to=$resolvedMirrorIndexUrl"
+            }
+            repository.upsert(githubStore.copy(indexUrl = resolvedMirrorIndexUrl))
+            repository.remove(resolvedIndexUrl)
+        }
+        val current = repository.getAll()
+        val alreadyPresent = current.any {
+            it.indexUrl == indexUrl || it.indexUrl == resolvedMirrorIndexUrl || it.indexUrl == resolvedIndexUrl
+        }
         if (alreadyPresent) {
             logcat(LogPriority.INFO) { "ExtStore: migration skip, default store already present" }
         } else {
