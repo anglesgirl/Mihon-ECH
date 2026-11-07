@@ -27,17 +27,24 @@ const val PREF_DOH_SHECAN = 12
 /** AliDNS first, 360 as fallback: the two domestic DoH providers the app uses. */
 const val PREF_DOH_ALIDNS_360 = 13
 
-/** Tries [primary] first and falls back to [fallback] when it fails to resolve. */
-class FallbackDns(
-    private val primary: Dns,
-    private val fallback: Dns,
-) : Dns {
+/** The user's Cloudflare Gateway DoH (public, published on the blog). */
+const val PREF_DOH_GATEWAY = 14
+
+/** Gateway first, AliDNS then 360 when it fails to resolve. */
+const val PREF_DOH_GATEWAY_ALI360 = 15
+
+/** Tries each server in order until one resolves. */
+class FallbackDns(private vararg val servers: Dns) : Dns {
     override fun lookup(hostname: String): List<InetAddress> {
-        return try {
-            primary.lookup(hostname)
-        } catch (_: IOException) {
-            fallback.lookup(hostname)
+        var failure: IOException? = null
+        for (server in servers) {
+            try {
+                return server.lookup(hostname)
+            } catch (e: IOException) {
+                failure = e
+            }
         }
+        throw failure ?: IOException("FallbackDns: no servers configured")
     }
 }
 
@@ -135,6 +142,20 @@ private fun OkHttpClient.Builder.q360DnsOverHttps(): DnsOverHttps = DnsOverHttps
 
 /** AliDNS first, 360 when Ali fails to resolve. */
 fun OkHttpClient.Builder.dohAliDNS360() = dns(FallbackDns(aliDnsOverHttps(), q360DnsOverHttps()))
+
+fun OkHttpClient.Builder.dohGateway() = dns(gatewayDnsOverHttps())
+
+private fun OkHttpClient.Builder.gatewayDnsOverHttps(): DnsOverHttps = DnsOverHttps.Builder().client(build())
+    .url("https://2bs3lpjxpv.cloudflare-gateway.com/dns-query".toHttpUrl())
+    .bootstrapDnsHosts(
+        InetAddress.getByName("162.159.36.5"),
+        InetAddress.getByName("162.159.36.20"),
+    )
+    .build()
+
+/** Gateway first, AliDNS then 360 when it fails to resolve. */
+fun OkHttpClient.Builder.dohGatewayAli360() =
+    dns(FallbackDns(gatewayDnsOverHttps(), aliDnsOverHttps(), q360DnsOverHttps()))
 
 fun OkHttpClient.Builder.dohQuad101() = dns(
     DnsOverHttps.Builder().client(build())

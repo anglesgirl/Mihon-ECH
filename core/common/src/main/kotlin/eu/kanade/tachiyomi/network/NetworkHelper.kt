@@ -66,6 +66,8 @@ class NetworkHelper(
             PREF_DOH_DNSPOD -> builder.dohDNSPod()
             PREF_DOH_360 -> builder.doh360()
             PREF_DOH_ALIDNS_360 -> builder.dohAliDNS360()
+            PREF_DOH_GATEWAY -> builder.dohGateway()
+            PREF_DOH_GATEWAY_ALI360 -> builder.dohGatewayAli360()
             PREF_DOH_QUAD101 -> builder.dohQuad101()
             PREF_DOH_MULLVAD -> builder.dohMullvad()
             PREF_DOH_CONTROLD -> builder.dohControlD()

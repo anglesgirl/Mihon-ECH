@@ -34,6 +34,8 @@ import eu.kanade.tachiyomi.network.PREF_DOH_360
 import eu.kanade.tachiyomi.network.PREF_DOH_ADGUARD
 import eu.kanade.tachiyomi.network.PREF_DOH_ALIDNS
 import eu.kanade.tachiyomi.network.PREF_DOH_ALIDNS_360
+import eu.kanade.tachiyomi.network.PREF_DOH_GATEWAY
+import eu.kanade.tachiyomi.network.PREF_DOH_GATEWAY_ALI360
 import eu.kanade.tachiyomi.network.PREF_DOH_CLOUDFLARE
 import eu.kanade.tachiyomi.network.PREF_DOH_CONTROLD
 import eu.kanade.tachiyomi.network.PREF_DOH_DNSPOD
@@ -248,6 +250,8 @@ object SettingsAdvancedScreen : SearchableSettings {
                     preference = networkPreferences.dohProvider,
                     entries = mapOf(
                         -1 to stringResource(MR.strings.disabled),
+                        PREF_DOH_GATEWAY_ALI360 to "Gateway + 阿里+360",
+                        PREF_DOH_GATEWAY to "Gateway",
                         PREF_DOH_ALIDNS_360 to "AliDNS + 360",
                         PREF_DOH_CLOUDFLARE to "Cloudflare",
                         PREF_DOH_GOOGLE to "Google",

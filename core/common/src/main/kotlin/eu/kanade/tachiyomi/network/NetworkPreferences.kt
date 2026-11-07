@@ -24,7 +24,7 @@ class NetworkPreferences(
         isDebugBuild,
     )
 
-    val dohProvider: Preference<Int> = preferenceStore.getInt("doh_provider", PREF_DOH_ALIDNS_360)
+    val dohProvider: Preference<Int> = preferenceStore.getInt("doh_provider", PREF_DOH_GATEWAY_ALI360)
 
     val defaultUserAgent: Preference<String> = preferenceStore.getString(
         "default_user_agent",
