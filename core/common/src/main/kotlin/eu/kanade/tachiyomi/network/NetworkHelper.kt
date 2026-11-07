@@ -41,12 +41,10 @@ class NetworkHelper(
             .addInterceptor(UncaughtExceptionInterceptor())
             .addInterceptor(UserAgentInterceptor(::defaultUserAgentProvider))
             // Keep the original URL visible to CloudflareInterceptor so its
-            // WebView challenge flow can open the real host. ECH routing must
-            // be the final application interceptor before the network call, so
-            // the release mirror sits between Cloudflare and ECH routing.
+            // WebView challenge flow can open the real host. The release mirror
+            // sits between Cloudflare and the network call.
             .addInterceptor(CloudflareInterceptor(context, cookieJar, scope, ::defaultUserAgentProvider))
             .addInterceptor(GithubReleaseMirrorInterceptor())
-            .addInterceptor(EchRoutingInterceptor())
 
         if (preferences.verboseLogging.get()) {
             val httpLoggingInterceptor = HttpLoggingInterceptor().apply {
@@ -67,6 +65,7 @@ class NetworkHelper(
             PREF_DOH_ALIDNS -> builder.dohAliDNS()
             PREF_DOH_DNSPOD -> builder.dohDNSPod()
             PREF_DOH_360 -> builder.doh360()
+            PREF_DOH_ALIDNS_360 -> builder.dohAliDNS360()
             PREF_DOH_QUAD101 -> builder.dohQuad101()
             PREF_DOH_MULLVAD -> builder.dohMullvad()
             PREF_DOH_CONTROLD -> builder.dohControlD()

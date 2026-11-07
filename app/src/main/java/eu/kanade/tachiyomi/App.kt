@@ -40,8 +40,6 @@ import eu.kanade.tachiyomi.data.coil.MangaCoverFetcher
 import eu.kanade.tachiyomi.data.coil.MangaCoverKeyer
 import eu.kanade.tachiyomi.data.coil.MangaKeyer
 import eu.kanade.tachiyomi.data.notification.Notifications
-import eu.kanade.tachiyomi.ech.EchDiagnostics
-import eu.kanade.tachiyomi.ech.EchProxyManager
 import eu.kanade.tachiyomi.extension.ExtensionManager
 import eu.kanade.tachiyomi.network.NetworkHelper
 import eu.kanade.tachiyomi.network.NetworkPreferences
@@ -103,10 +101,6 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
 
     @Inject private lateinit var networkHelper: Lazy<NetworkHelper>
 
-    // ECH proxy manager: injected eagerly (not Lazy) so its init installs the
-    // EchProxyRegistry provider before NetworkHelper is first used.
-    @Inject private lateinit var echProxyManager: EchProxyManager
-
     @Inject private lateinit var sourceManager: Lazy<SourceManager>
 
     @Inject private lateinit var extensionManager: Lazy<ExtensionManager>
@@ -148,19 +142,6 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
             Security.insertProviderAt(Conscrypt.newProvider(), 1)
         }
-
-        // Start the local ECH proxy early so the first network request can use it.
-        // (Metro port: the manager is already injected eagerly above; the old
-        // Injekt.get() call cannot resolve it since MetroInjektRegistrar only
-        // exposes a fixed set of bindings.)
-        val echDiagnostics = EchDiagnostics(this)
-        echDiagnostics.start()
-        echDiagnostics.event(
-            "ech_config",
-            "enabled=${networkPreferences.echEnabled.get()} domain=${networkPreferences.echConfigDomain.get()}",
-        )
-        echProxyManager.setDiagnostics(echDiagnostics)
-        echProxyManager.startAsync()
 
         setupNotificationChannels()
 

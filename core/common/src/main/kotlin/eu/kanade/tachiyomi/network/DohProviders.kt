@@ -1,8 +1,10 @@
 package eu.kanade.tachiyomi.network
 
+import okhttp3.Dns
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.dnsoverhttps.DnsOverHttps
+import java.io.IOException
 import java.net.InetAddress
 
 /**
@@ -21,6 +23,23 @@ const val PREF_DOH_MULLVAD = 9
 const val PREF_DOH_CONTROLD = 10
 const val PREF_DOH_NJALLA = 11
 const val PREF_DOH_SHECAN = 12
+
+/** AliDNS first, 360 as fallback: the two domestic DoH providers the app uses. */
+const val PREF_DOH_ALIDNS_360 = 13
+
+/** Tries [primary] first and falls back to [fallback] when it fails to resolve. */
+class FallbackDns(
+    private val primary: Dns,
+    private val fallback: Dns,
+) : Dns {
+    override fun lookup(hostname: String): List<InetAddress> {
+        return try {
+            primary.lookup(hostname)
+        } catch (_: IOException) {
+            fallback.lookup(hostname)
+        }
+    }
+}
 
 fun OkHttpClient.Builder.dohCloudflare() = dns(
     DnsOverHttps.Builder().client(build())
@@ -77,17 +96,17 @@ fun OkHttpClient.Builder.dohQuad9() = dns(
         .build(),
 )
 
-fun OkHttpClient.Builder.dohAliDNS() = dns(
-    DnsOverHttps.Builder().client(build())
-        .url("https://dns.alidns.com/dns-query".toHttpUrl())
-        .bootstrapDnsHosts(
-            InetAddress.getByName("223.5.5.5"),
-            InetAddress.getByName("223.6.6.6"),
-            InetAddress.getByName("2400:3200::1"),
-            InetAddress.getByName("2400:3200:baba::1"),
-        )
-        .build(),
-)
+fun OkHttpClient.Builder.dohAliDNS() = dns(aliDnsOverHttps())
+
+private fun OkHttpClient.Builder.aliDnsOverHttps(): DnsOverHttps = DnsOverHttps.Builder().client(build())
+    .url("https://dns.alidns.com/dns-query".toHttpUrl())
+    .bootstrapDnsHosts(
+        InetAddress.getByName("223.5.5.5"),
+        InetAddress.getByName("223.6.6.6"),
+        InetAddress.getByName("2400:3200::1"),
+        InetAddress.getByName("2400:3200:baba::1"),
+    )
+    .build()
 
 fun OkHttpClient.Builder.dohDNSPod() = dns(
     DnsOverHttps.Builder().client(build())
@@ -99,20 +118,23 @@ fun OkHttpClient.Builder.dohDNSPod() = dns(
         .build(),
 )
 
-fun OkHttpClient.Builder.doh360() = dns(
-    DnsOverHttps.Builder().client(build())
-        .url("https://doh.360.cn/dns-query".toHttpUrl())
-        .bootstrapDnsHosts(
-            InetAddress.getByName("101.226.4.6"),
-            InetAddress.getByName("218.30.118.6"),
-            InetAddress.getByName("123.125.81.6"),
-            InetAddress.getByName("140.207.198.6"),
-            InetAddress.getByName("180.163.249.75"),
-            InetAddress.getByName("101.199.113.208"),
-            InetAddress.getByName("36.99.170.86"),
-        )
-        .build(),
-)
+fun OkHttpClient.Builder.doh360() = dns(q360DnsOverHttps())
+
+private fun OkHttpClient.Builder.q360DnsOverHttps(): DnsOverHttps = DnsOverHttps.Builder().client(build())
+    .url("https://doh.360.cn/dns-query".toHttpUrl())
+    .bootstrapDnsHosts(
+        InetAddress.getByName("101.226.4.6"),
+        InetAddress.getByName("218.30.118.6"),
+        InetAddress.getByName("123.125.81.6"),
+        InetAddress.getByName("140.207.198.6"),
+        InetAddress.getByName("180.163.249.75"),
+        InetAddress.getByName("101.199.113.208"),
+        InetAddress.getByName("36.99.170.86"),
+    )
+    .build()
+
+/** AliDNS first, 360 when Ali fails to resolve. */
+fun OkHttpClient.Builder.dohAliDNS360() = dns(FallbackDns(aliDnsOverHttps(), q360DnsOverHttps()))
 
 fun OkHttpClient.Builder.dohQuad101() = dns(
     DnsOverHttps.Builder().client(build())
