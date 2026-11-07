@@ -33,6 +33,7 @@ class PackageInstallerInstaller(private val service: Service) : Installer(servic
     private val packageActionReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             val status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)
+            val packageName = intent.getStringExtra(PackageInstaller.EXTRA_PACKAGE_NAME)
             when (status) {
                 PackageInstaller.STATUS_PENDING_USER_ACTION -> {
                     val userAction = intent.getParcelableExtraCompat<Intent>(Intent.EXTRA_INTENT)
@@ -72,7 +73,18 @@ class PackageInstallerInstaller(private val service: Service) : Installer(servic
                 PackageInstaller.STATUS_FAILURE_ABORTED -> {
                     continueQueue(InstallStep.Idle)
                 }
-                PackageInstaller.STATUS_SUCCESS -> continueQueue(InstallStep.Installed)
+                PackageInstaller.STATUS_SUCCESS -> {
+                    // Same as ShizukuInstaller: the session result is the only
+                    // reliable signal, the PACKAGE_ADDED broadcast may be lost.
+                    if (packageName != null) {
+                        logcat(LogPriority.INFO) { "ExtInstall: session success, notify added $packageName" }
+                        eu.kanade.tachiyomi.extension.util.ExtensionInstallReceiver.notifyAdded(
+                            context,
+                            packageName,
+                        )
+                    }
+                    continueQueue(InstallStep.Installed)
+                }
                 else -> {
                     logcat(LogPriority.INFO) {
                         "The system installer failed ($status): ${intent.getStringExtra(

@@ -70,6 +70,19 @@ class ShizukuInstaller(private val service: Service) : Installer(service) {
             val packageName = intent.getStringExtra(PackageInstaller.EXTRA_PACKAGE_NAME)
 
             if (status == PackageInstaller.STATUS_SUCCESS) {
+                // A session install reports success here, but nothing else tells the
+                // extension manager: registration otherwise depends on the system
+                // PACKAGE_ADDED broadcast reaching a dynamic receiver, which is
+                // lost when the app is killed behind the installer. Notify
+                // explicitly, like the private-install path does, so the first
+                // install registers instead of only the reinstall (PACKAGE_REPLACED).
+                if (packageName != null) {
+                    logcat(LogPriority.INFO) { "ExtInstall: shizuku success, notify added $packageName" }
+                    eu.kanade.tachiyomi.extension.util.ExtensionInstallReceiver.notifyAdded(
+                        context,
+                        packageName,
+                    )
+                }
                 continueQueue(InstallStep.Installed)
             } else {
                 logcat(LogPriority.INFO) { "Shizuku failed to install $packageName ($status): $message" }

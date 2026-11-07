@@ -64,6 +64,10 @@ internal class ExtensionInstallReceiver(
     override fun onReceive(context: Context, intent: Intent?) {
         if (intent == null) return
 
+        logcat(LogPriority.INFO) {
+            "ExtInstall: broadcast action=${intent.action} pkg=${getPackageNameFromIntent(intent)} " +
+                "replacing=${isReplacing(intent)}"
+        }
         when (intent.action) {
             Intent.ACTION_PACKAGE_ADDED, ACTION_EXTENSION_ADDED -> {
                 if (isReplacing(intent)) return
@@ -96,9 +100,17 @@ internal class ExtensionInstallReceiver(
                     event.pkgName,
                 )
             ) {
-                is Extension.Loaded -> listener.onExtensionLoaded(extension)
-                is Extension.NotLoaded -> listener.onExtensionNotLoaded(extension)
-                null -> {}
+                is Extension.Loaded -> {
+                    logcat(LogPriority.INFO) { "ExtInstall: loaded ${event.pkgName}" }
+                    listener.onExtensionLoaded(extension)
+                }
+                is Extension.NotLoaded -> {
+                    logcat(LogPriority.INFO) {
+                        "ExtInstall: not loaded ${event.pkgName} reason=${extension.reason}"
+                    }
+                    listener.onExtensionNotLoaded(extension)
+                }
+                null -> logcat(LogPriority.INFO) { "ExtInstall: package not found ${event.pkgName}" }
             }
             is Event.Removed -> listener.onPackageUninstalled(event.pkgName)
         }
