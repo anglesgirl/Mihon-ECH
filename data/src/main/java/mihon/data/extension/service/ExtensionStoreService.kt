@@ -34,7 +34,30 @@ class ExtensionStoreService(
 ) {
     suspend fun fetch(indexUrl: String): Result<ExtensionStore> = withContext(Dispatchers.IO) { fetchStore(indexUrl) }
 
+    /**
+     * Fetches a store, falling back to the self-hosted mirror when the
+     * upstream jsDelivr address fails: on the user's network its TLS
+     * handshake gets Connection reset, so a jsDelivr-only fetch leaves the
+     * store table empty. The mirror serves the same repo files.
+     */
     private suspend fun fetchStore(indexUrl: String): Result<ExtensionStore> {
+        val result = fetchStoreOnce(indexUrl)
+        if (result.isSuccess) return result
+        val fallbackUrl = jsDelivrToMirror(indexUrl) ?: return result
+        logcat(LogPriority.INFO) {
+            "ExtStore: fetch fallback url=$indexUrl fallbackUrl=$fallbackUrl " +
+                "error=${result.exceptionOrNull()?.message}"
+        }
+        return fetchStoreOnce(fallbackUrl)
+    }
+
+    private fun jsDelivrToMirror(indexUrl: String): String? {
+        val prefix = "https://cdn.jsdelivr.net/gh/keiyoushi/extensions@repo/"
+        if (!indexUrl.startsWith(prefix)) return null
+        return "https://gh.anglesya.win/keiyoushi/extensions/raw/repo/" + indexUrl.removePrefix(prefix)
+    }
+
+    private suspend fun fetchStoreOnce(indexUrl: String): Result<ExtensionStore> {
         var updatedIndexUrl: String = indexUrl
         return try {
             logcat(LogPriority.INFO) { "ExtStore: fetch start url=$updatedIndexUrl" }
@@ -75,7 +98,7 @@ class ExtensionStoreService(
                     logcat(LogPriority.INFO) {
                         "ExtStore: indexV2 redirect from=$updatedIndexUrl to=${networkStore.indexV2}"
                     }
-                    return fetchStore(networkStore.indexV2)
+                    return fetchStoreOnce(networkStore.indexV2)
                 }
 
                 networkStore.toExtensionStore(updatedIndexUrl)

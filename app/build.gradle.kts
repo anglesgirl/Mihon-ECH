@@ -37,8 +37,8 @@ android {
     defaultConfig {
         applicationId = "com.anglesgirl.mihonech"
 
-        versionCode = 2026110702
-        versionName = "0.21.3-echfix3"
+        versionCode = 2026110703
+        versionName = "0.21.3-echfix4"
 
         buildConfigField("boolean", "TELEMETRY_INCLUDED", "${Config.includeTelemetry}")
         buildConfigField("boolean", "UPDATER_ENABLED", "${Config.enableUpdater}")
