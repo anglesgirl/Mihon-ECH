@@ -138,6 +138,7 @@ class ExtensionInstaller(
                 val intent = Intent(context, ExtensionInstallActivity::class.java)
                     .setDataAndType(tempFile.getUriCompat(context), APK_MIME)
                     .putExtra(EXTRA_DOWNLOAD_ID, downloadId)
+                    .putExtra(EXTRA_PACKAGE_NAME, packageInfo.packageName)
                     .setFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
 
                 context.startActivity(intent)
@@ -209,5 +210,6 @@ class ExtensionInstaller(
     companion object {
         const val APK_MIME = "application/vnd.android.package-archive"
         const val EXTRA_DOWNLOAD_ID = "ExtensionInstaller.extra.DOWNLOAD_ID"
+        const val EXTRA_PACKAGE_NAME = "ExtensionInstaller.extra.PACKAGE_NAME"
     }
 }

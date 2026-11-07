@@ -84,6 +84,15 @@ class ExtensionInstallActivity : Activity() {
                 InstallStep.Error
             }
         }
+        if (resultCode == RESULT_OK) {
+            // Same as the session installers: the system installer reporting
+            // success is the reliable signal. Don't wait for PACKAGE_ADDED,
+            // which is lost when the app is killed behind the installer.
+            intent.extras?.getString(ExtensionInstaller.EXTRA_PACKAGE_NAME)?.let { pkgName ->
+                logcat(LogPriority.INFO) { "ExtInstall: legacy success, notify added $pkgName" }
+                ExtensionInstallReceiver.notifyAdded(this, pkgName)
+            }
+        }
         extensionManager.updateInstallStep(downloadId, newStep)
     }
 }
