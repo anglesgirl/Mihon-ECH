@@ -68,7 +68,7 @@ class EchRoutingInterceptorTest {
         listOf("GET", "HEAD", "OPTIONS").forEach { method ->
             assertTrue(request(method).isSafeForKatHttp3Retry())
         }
-        assertFalse(request("GET", body = "payload").isSafeForKatHttp3Retry())
+        assertFalse(request("OPTIONS", body = "payload").isSafeForKatHttp3Retry())
         listOf(request("POST", body = "payload"), request("PUT", body = "payload"), request("DELETE")).forEach {
             assertFalse(it.isSafeForKatHttp3Retry())
         }
