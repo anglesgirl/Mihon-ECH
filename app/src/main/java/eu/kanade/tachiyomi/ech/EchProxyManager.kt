@@ -5,6 +5,7 @@ import dev.kathttp3.KatHttp3Client
 import dev.kathttp3.KatHttp3ClientConfig
 import eu.kanade.tachiyomi.network.CfEchResolver
 import eu.kanade.tachiyomi.network.ChannelDecision
+import eu.kanade.tachiyomi.network.EchResolverBootstrap
 import eu.kanade.tachiyomi.network.EchProxyProvider
 import eu.kanade.tachiyomi.network.NetworkPreferences
 import logcat.LogPriority
@@ -43,24 +44,26 @@ class EchProxyManager(
         if (enabled) {
             runCatching { ensureClient() }
                 .onFailure {
-                    diagnostics?.event("ech_init_failed", "error=${it.javaClass.simpleName}: ${it.message}")
-                    logcat(LogPriority.ERROR, it) { "ECH: kathttp3 init failed" }
+                    diagnostics?.event("ech_init_failed", "source=client outcome=error")
+                    logcat(LogPriority.ERROR) { "ECH: kathttp3 init failed (${it.javaClass.simpleName})" }
                 }
         }
     }
 
     private fun ensureClient(): KatHttp3Client? = synchronized(this) {
         client ?: runCatching {
-            val dohEndpoints = preferences.echDohEndpoints.get()
-                .split(',')
-                .map(String::trim)
-                .filter { it.startsWith("https://") }
+            val dohEndpoints = EchResolverBootstrap.parseEndpointList(preferences.echDohEndpoints.get())
             if (dohEndpoints.isEmpty()) {
-                diagnostics?.event("ech_init_failed", "reason=no_doh_endpoints")
+                diagnostics?.event("ech_init_failed", "source=configured count=0 index=0 outcome=unusable")
                 logcat(LogPriority.WARN) { "ECH: no DoH endpoints configured" }
                 return@synchronized null
             }
-            val resolver = CfEchResolver(dohEndpoints)
+            val resolver = CfEchResolver(
+                dohEndpoints = dohEndpoints,
+                configDomain = preferences.echConfigDomain.get(),
+                configuredEdgeIps = preferences.echIpList.get().split(',').map(String::trim),
+                diagnostic = { name, detail -> diagnostics?.event(name, detail) },
+            )
             KatHttp3Client(
                 config = KatHttp3ClientConfig(
                     resolver = resolver,
@@ -74,8 +77,8 @@ class EchProxyManager(
                 applicationContext = context.applicationContext,
             ).also { client = it }
         }.onFailure {
-            diagnostics?.event("ech_init_failed", "error=${it.javaClass.simpleName}: ${it.message}")
-            logcat(LogPriority.ERROR, it) { "ECH: kathttp3 init failed" }
+            diagnostics?.event("ech_init_failed", "source=client outcome=error")
+            logcat(LogPriority.ERROR) { "ECH: kathttp3 init failed (${it.javaClass.simpleName})" }
         }.getOrNull()
     }
 
