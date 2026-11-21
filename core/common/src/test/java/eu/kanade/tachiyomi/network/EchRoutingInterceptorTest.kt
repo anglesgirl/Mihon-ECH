@@ -89,6 +89,7 @@ class EchRoutingInterceptorTest {
                 when (method) {
                     "POST" -> post(requireNotNull(body).toRequestBody())
                     "HEAD" -> head()
+                    "DELETE" -> delete()
                     else -> this.method(method, body?.toRequestBody())
                 }
             }
