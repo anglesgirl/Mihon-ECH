@@ -37,7 +37,11 @@ class CfEchResolver(
             host = host,
             port = port,
             source = "target",
-            isUsable = { addresses -> addresses.any { EchResolverBootstrap.isLiteralIp(it.ip) || it.echConfig != null } },
+            isUsable = { addresses ->
+                addresses.any { address ->
+                    EchResolverBootstrap.isLiteralIp(address.ip) || address.echConfig != null
+                }
+            },
         ).orEmpty()
 
         // HTTPS RR ECH wins; TXT ECH and then Cloudflare live ECH are fallback sources only.
@@ -66,24 +70,35 @@ class CfEchResolver(
                 configuredEndpoints.forEachIndexed { index, endpoint ->
                     val pieces = runCatching { fetchTxt(endpoint, domain) }.getOrNull()
                     val outcome = if (pieces.isNullOrEmpty()) "unusable" else "usable"
-                    diagnostic("ech_bootstrap_attempt", "source=txt count=${configuredEndpoints.size} index=${index + 1} outcome=$outcome")
+                    diagnostic(
+                        "ech_bootstrap_attempt",
+                        "source=txt count=${configuredEndpoints.size} index=${index + 1} outcome=$outcome",
+                    )
                     if (!pieces.isNullOrEmpty()) {
                         txtPieces += pieces
                         val parsed = EchResolverBootstrap.parseTxt(txtPieces, configuredEndpoints, configuredIps)
                         if (parsed.txtDohEndpoints.isNotEmpty()) {
                             bootstrap = parsed
-                            diagnostic("ech_bootstrap_loaded", "source=txt count=${parsed.dohEndpoints.size} index=${index + 1} outcome=usable")
+                            diagnostic(
+                                "ech_bootstrap_loaded",
+                                "source=txt count=${parsed.dohEndpoints.size} index=${index + 1} outcome=usable",
+                            )
                             return parsed
                         }
                     }
                 }
             }
-            val selected = if (txtPieces.isEmpty()) settingsFallback else
+            val selected = if (txtPieces.isEmpty()) {
+                settingsFallback
+            } else {
                 EchResolverBootstrap.parseTxt(txtPieces, configuredEndpoints, configuredIps)
+            }
             bootstrap = selected
+            val source = if (txtPieces.isEmpty()) "settings" else "txt"
+            val outcome = if (selected.dohEndpoints.isEmpty()) "unusable" else "usable"
             diagnostic(
                 "ech_bootstrap_loaded",
-                "source=${if (txtPieces.isEmpty()) "settings" else "txt"} count=${selected.dohEndpoints.size} index=0 outcome=${if (selected.dohEndpoints.isEmpty()) "unusable" else "usable"}",
+                "source=$source count=${selected.dohEndpoints.size} index=0 outcome=$outcome",
             )
             return selected
         }

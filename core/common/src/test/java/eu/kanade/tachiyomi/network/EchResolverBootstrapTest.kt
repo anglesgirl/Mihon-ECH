@@ -16,7 +16,8 @@ class EchResolverBootstrapTest {
         val parsed = EchResolverBootstrap.parseTxt(
             pieces = listOf(
                 "\"doh=https://one.example/dns-query; ip=192.0.2.4,2001:db8::4\"",
-                "\"doh2=http://insecure.example/dns-query; doh3=https://three.example/dns-query\"\nechconfig=$encodedEch",
+                "\"doh2=http://insecure.example/dns-query; " +
+                    "doh3=https://three.example/dns-query\"\nechconfig=$encodedEch",
             ),
             configuredEndpoints = listOf("https://settings.example/dns-query"),
             configuredIps = listOf("198.51.100.9"),

@@ -42,7 +42,4 @@ interface EchProxyProvider {
 
     /** 记录一次判定结果。 */
     fun recordDecision(host: String, decision: ChannelDecision) {}
-
-    /** 记录一次探测失败（后续直接走 kathttp3，不再反复 5s 探测）。 */
-    fun recordFailure(host: String) {}
 }

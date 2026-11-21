@@ -1,10 +1,10 @@
 package eu.kanade.tachiyomi.network
 
-import dev.kathttp3.KatHttp3Call
 import dev.kathttp3.KatHttp3Client
 import dev.kathttp3.KatHttp3Header
 import dev.kathttp3.KatHttp3Request
 import dev.kathttp3.KatHttp3StreamEvent
+import eu.kanade.tachiyomi.network.interceptor.isCloudflareChallenge
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -12,6 +12,7 @@ import logcat.LogPriority
 import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.Protocol
+import okhttp3.Request
 import okhttp3.Response
 import okhttp3.ResponseBody
 import okio.Buffer
@@ -25,24 +26,24 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 
+private const val MAX_QUEUED_BODY_CHUNKS = 8
+private const val BODY_QUEUE_OFFER_TIMEOUT_MS = 100L
+
 /**
- * 失败驱动的 ECH/H3 路由拦截器（替换 Go 本地代理方案）。
+ * Failure/challenge-driven ECH/H3 routing.
  *
- * 流程（零开销优先，失败才介入）：
- * 1. 已知可直连域名 → 原样放行 OkHttp（零开销）。
- * 2. 未知域名 → OkHttp 快速探测（connect 压到 5s，避免被墙域名 30s 白等）
- *    - 通 → 记 DIRECT，放行。
- *    - 失败（超时/重置，被墙特征）→ 记 KAT_HTTP3，走 kathttp3。
- * 3. kathttp3 通道：
- *    - CF 托管（AS13335）→ 注入 ECH（目标域名配置，或 CF 官方活值兜底）+ H3
- *    - 非 CF → 纯 H3（UDP 通道，绕过 TCP RST）
- *    成功后记 KAT_HTTP3，后续直接走 kathttp3，不再探测。
+ * Ordinary HTTPS responses stay on OkHttp. A request is sent through kathttp3
+ * only after a direct connection failure or a Cloudflare challenge response,
+ * and only when it is safe to retry. In particular, requests with bodies are
+ * never replayed because this adapter does not copy OkHttp bodies to kathttp3.
  */
 class EchRoutingInterceptor(
     private val scope: CoroutineScope = CoroutineScope(Dispatchers.Default),
 ) : Interceptor {
+    private val nextDiagnosticId = AtomicLong(0)
 
     override fun intercept(chain: Interceptor.Chain): Response {
         val request = chain.request()
@@ -52,29 +53,180 @@ class EchRoutingInterceptor(
         val k3 = provider?.katHttp3() ?: return chain.proceed(request)
 
         when (provider.decision(host)) {
-            ChannelDecision.DIRECT -> return chain.proceed(request)
-            ChannelDecision.KAT_HTTP3 -> return viaKatHttp3(k3, request, host)
-            ChannelDecision.UNKNOWN -> Unit
+            ChannelDecision.KAT_HTTP3 -> {
+                if (request.isSafeForKatHttp3Retry()) {
+                    val diagnosticId = nextDiagnosticId.incrementAndGet()
+                    provider.diagnostic(
+                        "ech_request_attempt",
+                        "id=$diagnosticId host=$host method=${request.method} reason=cached_kathttp3_route",
+                    )
+                    return try {
+                        viaKatHttp3(k3, request, host, diagnosticId)
+                    } catch (error: IOException) {
+                        provider.recordDecision(host, ChannelDecision.UNKNOWN)
+                        provider.diagnostic(
+                            "ech_request_failed",
+                            "id=$diagnosticId host=$host " +
+                                "reason=cached_kathttp3_io_error type=${error.javaClass.simpleName}",
+                        )
+                        val directResponse = chain.proceed(request)
+                        provider.recordDecision(
+                            host,
+                            if (directResponse.isCloudflareChallenge()) {
+                                ChannelDecision.UNKNOWN
+                            } else {
+                                ChannelDecision.DIRECT
+                            },
+                        )
+                        provider.diagnostic(
+                            "ech_route_fallback_direct",
+                            "id=$diagnosticId host=$host method=${request.method} " +
+                                "status=${directResponse.code} reason=cached_kathttp3_failure",
+                        )
+                        directResponse
+                    }
+                }
+                provider.diagnostic(
+                    "ech_request_skipped",
+                    "host=$host method=${request.method} reason=non_replayable_request",
+                )
+                return chain.proceed(request)
+            }
+            ChannelDecision.DIRECT -> return directOrRetry(
+                chain = chain,
+                request = request,
+                host = host,
+                provider = provider,
+                k3 = k3,
+                useShortConnectTimeout = false,
+            )
+            ChannelDecision.UNKNOWN -> return directOrRetry(
+                chain = chain,
+                request = request,
+                host = host,
+                provider = provider,
+                k3 = k3,
+                useShortConnectTimeout = true,
+            )
+        }
+    }
+
+    private fun directOrRetry(
+        chain: Interceptor.Chain,
+        request: Request,
+        host: String,
+        provider: EchProxyProvider,
+        k3: KatHttp3Client,
+        useShortConnectTimeout: Boolean,
+    ): Response {
+        val directResponse = try {
+            if (useShortConnectTimeout) {
+                chain.withConnectTimeout(5, TimeUnit.SECONDS).proceed(request)
+            } else {
+                chain.proceed(request)
+            }
+        } catch (error: IOException) {
+            if (!request.isSafeForKatHttp3Retry()) {
+                provider.recordDecision(host, ChannelDecision.UNKNOWN)
+                provider.diagnostic(
+                    "ech_request_skipped",
+                    "host=$host method=${request.method} reason=connect_failure_non_replayable",
+                )
+                throw error
+            }
+            val diagnosticId = nextDiagnosticId.incrementAndGet()
+            provider.diagnostic(
+                "ech_request_attempt",
+                "id=$diagnosticId host=$host method=${request.method} reason=direct_connect_failure",
+            )
+            logcat(LogPriority.INFO) { "ECH: kathttp3 retry id=$diagnosticId host=$host reason=direct_connect_failure" }
+            return try {
+                viaKatHttp3(k3, request, host, diagnosticId)
+            } catch (katError: IOException) {
+                provider.recordDecision(host, ChannelDecision.UNKNOWN)
+                provider.diagnostic(
+                    "ech_request_failed",
+                    "id=$diagnosticId host=$host " +
+                        "reason=kathttp3_after_direct_connect_failure type=${katError.javaClass.simpleName}",
+                )
+                if (useShortConnectTimeout) {
+                    return try {
+                        chain.proceed(request).also { fallbackResponse ->
+                            provider.recordDecision(
+                                host,
+                                if (fallbackResponse.isCloudflareChallenge()) {
+                                    ChannelDecision.UNKNOWN
+                                } else {
+                                    ChannelDecision.DIRECT
+                                },
+                            )
+                            provider.diagnostic(
+                                "ech_route_fallback_direct",
+                                "id=$diagnosticId host=$host method=${request.method} " +
+                                    "status=${fallbackResponse.code} reason=short_probe_and_kathttp3_failure",
+                            )
+                        }
+                    } catch (directError: IOException) {
+                        directError.addSuppressed(katError)
+                        directError.addSuppressed(error)
+                        throw directError
+                    }
+                }
+                throw katError
+            }
         }
 
-        // 未知域名：OkHttp 快速探测（被墙域名 30s 超时太慢，压到 5s）
-        val probe = runCatching {
-            chain.withConnectTimeout(5, TimeUnit.SECONDS).proceed(request)
-        }
-        if (probe.isSuccess) {
+        if (!directResponse.isCloudflareChallenge()) {
             provider.recordDecision(host, ChannelDecision.DIRECT)
-            return probe.getOrThrow()
+            provider.diagnostic(
+                "ech_route_direct",
+                "host=$host method=${request.method} status=${directResponse.code}",
+            )
+            return directResponse
         }
-        provider.recordFailure(host)
-        return viaKatHttp3(k3, request, host)
+
+        if (!request.isSafeForKatHttp3Retry()) {
+            // Do not cache a challenge as DIRECT: a later safe GET may still
+            // benefit from ECH. This request itself is not replayed.
+            provider.recordDecision(host, ChannelDecision.UNKNOWN)
+            provider.diagnostic(
+                "ech_request_skipped",
+                "host=$host method=${request.method} status=${directResponse.code} reason=challenge_non_replayable",
+            )
+            return directResponse
+        }
+
+        val diagnosticId = nextDiagnosticId.incrementAndGet()
+        provider.diagnostic(
+            "ech_request_attempt",
+            "id=$diagnosticId host=$host method=${request.method} " +
+                "status=${directResponse.code} reason=cloudflare_challenge",
+        )
+        logcat(LogPriority.INFO) {
+            "ECH: kathttp3 retry id=$diagnosticId host=$host reason=cloudflare_challenge status=${directResponse.code}"
+        }
+        return try {
+            viaKatHttp3(k3, request, host, diagnosticId).also { directResponse.close() }
+        } catch (error: IOException) {
+            provider.recordDecision(host, ChannelDecision.UNKNOWN)
+            provider.diagnostic(
+                "ech_request_failed",
+                "id=$diagnosticId host=$host reason=kathttp3_io_error type=${error.javaClass.simpleName}",
+            )
+            // Preserve the original HTTP response if the ECH transport itself
+            // is unavailable; do not turn an ordinary server response into an
+            // application-level exception.
+            directResponse
+        }
     }
 
     private fun viaKatHttp3(
         k3: KatHttp3Client,
-        request: okhttp3.Request,
+        request: Request,
         host: String,
+        diagnosticId: Long,
     ): Response {
-        logcat(LogPriority.INFO) { "ECH: kathttp3 transport host=$host" }
+        logcat(LogPriority.INFO) { "ECH: kathttp3 transport id=$diagnosticId host=$host" }
         val k3Request = KatHttp3Request(
             method = request.method,
             url = request.url.toString(),
@@ -86,9 +238,16 @@ class EchRoutingInterceptor(
         val headLatch = CountDownLatch(1)
         val statusRef = AtomicReference(0)
         val headerRef = AtomicReference<List<Pair<String, String>>>(emptyList())
-        val bodyQueue = LinkedBlockingQueue<ByteArray>()
+        val bodyQueue = LinkedBlockingQueue<ByteArray>(MAX_QUEUED_BODY_CHUNKS)
+        val streamClosed = AtomicBoolean(false)
         val finished = AtomicBoolean(false)
         val errorRef = AtomicReference<Throwable?>()
+
+        fun enqueueBody(bytes: ByteArray) {
+            while (!streamClosed.get()) {
+                if (bodyQueue.offer(bytes, BODY_QUEUE_OFFER_TIMEOUT_MS, TimeUnit.MILLISECONDS)) return
+            }
+        }
 
         scope.launch {
             try {
@@ -99,22 +258,33 @@ class EchRoutingInterceptor(
                             headerRef.set(event.headers.map { it.name to it.value })
                             headLatch.countDown()
                         }
-                        is KatHttp3StreamEvent.Body -> bodyQueue.put(event.bytes)
+                        is KatHttp3StreamEvent.Body -> if (event.bytes.isNotEmpty()) enqueueBody(event.bytes)
                     }
                 }
             } catch (t: Throwable) {
-                errorRef.set(t)
+                if (!streamClosed.get()) errorRef.set(t)
             } finally {
+                headLatch.countDown()
+                enqueueBody(ByteArray(0)) // EOF sentinel; errorRef is checked before EOF is returned.
                 finished.set(true)
-                bodyQueue.put(ByteArray(0)) // EOF 哨兵
             }
         }
 
         if (!headLatch.await(15, TimeUnit.SECONDS)) {
+            streamClosed.set(true)
+            bodyQueue.clear()
             call.cancel()
             throw IOException("ECH: response headers timeout for $host")
         }
         val status = statusRef.get()
+        if (status == 0) {
+            streamClosed.set(true)
+            bodyQueue.clear()
+            call.cancel()
+            val failure = errorRef.get()
+            if (failure is IOException) throw failure
+            throw IOException("ECH: kathttp3 ended before response headers for $host", failure)
+        }
         val headers = headerRef.get()
         val contentType = headers.firstOrNull { it.first.equals("content-type", true) }?.second
             ?.toMediaTypeOrNull()
@@ -125,20 +295,26 @@ class EchRoutingInterceptor(
             override fun contentType() = contentType
             override fun contentLength(): Long = contentLength
             override fun source(): BufferedSource =
-                KatHttp3Source(bodyQueue, finished, errorRef) { call.cancel() }.buffer()
+                KatHttp3Source(bodyQueue, finished, errorRef) {
+                    if (streamClosed.compareAndSet(false, true)) {
+                        bodyQueue.clear()
+                        bodyQueue.offer(ByteArray(0))
+                        call.cancel()
+                    }
+                }.buffer()
         }
 
         val okHeaders = okhttp3.Headers.Builder().apply {
             headers.forEach { (name, value) ->
-                // content-length 由 ResponseBody.contentLength() 提供，避免双源
+                // ResponseBody.contentLength() is authoritative.
                 if (!name.equals("content-length", true)) add(name, value)
             }
         }.build()
 
-        provider.recordDecision(host, ChannelDecision.KAT_HTTP3)
+        providerRecordResult(host, diagnosticId, status)
         return Response.Builder()
             .request(request)
-            // OkHttp 枚举无 HTTP/3，用 QUIC 语义最接近；对消费者无实质影响
+            // OkHttp has no HTTP/3 enum; HTTP/2 is the closest available value.
             .protocol(Protocol.HTTP_2)
             .code(status)
             .message("")
@@ -146,29 +322,88 @@ class EchRoutingInterceptor(
             .body(body)
             .build()
     }
+
+    private fun providerRecordResult(host: String, diagnosticId: Long, status: Int) {
+        val provider = EchProxyRegistry.provider ?: return
+        provider.recordDecision(host, ChannelDecision.KAT_HTTP3)
+        provider.diagnostic(
+            "ech_request_result",
+            "id=$diagnosticId host=$host transport=kathttp3 status=$status handshake=connection_scoped_native_logcat",
+        )
+        logcat(LogPriority.INFO) {
+            "ECH: kathttp3 response id=$diagnosticId host=$host status=$status; " +
+                "connection handshake acceptance is logged by kathttp3 as 'ECH negotiated=<0|1>'"
+        }
+    }
 }
 
-/** 把 kathttp3 的流式事件桥接成 okio [Source]，边收边给，不整响应缓冲。 */
-private class KatHttp3Source(
+/** Only body-less safe methods can be replayed over kathttp3. */
+internal fun Request.isSafeForKatHttp3Retry(): Boolean =
+    body == null && method in setOf("GET", "HEAD", "OPTIONS")
+
+/**
+ * Routes a Cloudflare challenge/block response to kathttp3 only when retrying
+ * the original request cannot duplicate a non-idempotent operation.
+ */
+internal fun shouldRetryChallengeViaKatHttp3(request: Request, response: Response): Boolean =
+    request.isSafeForKatHttp3Retry() && response.isCloudflareChallenge()
+
+/** Bridges kathttp3's streaming events to an okio [Source] with bounded buffering. */
+internal class KatHttp3Source(
     private val queue: LinkedBlockingQueue<ByteArray>,
     private val finished: AtomicBoolean,
     private val errorRef: AtomicReference<Throwable?>,
     private val onClose: () -> Unit,
 ) : Source {
+    private val closed = AtomicBoolean(false)
+    private var currentChunk: ByteArray? = null
+    private var currentOffset = 0
 
     override fun read(sink: Buffer, byteCount: Long): Long {
-        val chunk = queue.poll(30, TimeUnit.SECONDS)
-        if (chunk == null) {
-            errorRef.get()?.let { throw it }
-            if (finished.get()) return -1L // EOF
-            throw IOException("kathttp3 stream read timeout")
+        if (closed.get()) throw IOException("closed")
+        require(byteCount >= 0L) { "byteCount < 0: $byteCount" }
+        if (byteCount == 0L) return 0L
+
+        while (true) {
+            val chunk = currentChunk
+            if (chunk != null && currentOffset < chunk.size) {
+                val count = minOf(byteCount, (chunk.size - currentOffset).toLong()).toInt()
+                sink.write(chunk, currentOffset, count)
+                currentOffset += count
+                if (currentOffset == chunk.size) {
+                    currentChunk = null
+                    currentOffset = 0
+                }
+                return count.toLong()
+            }
+
+            currentChunk = null
+            currentOffset = 0
+            val next = queue.poll(30, TimeUnit.SECONDS)
+            if (closed.get()) throw IOException("closed")
+            if (next == null) {
+                throwReadFailure()
+                if (finished.get()) return -1L
+                throw IOException("kathttp3 stream read timeout")
+            }
+            if (next.isEmpty()) {
+                throwReadFailure()
+                return -1L
+            }
+            currentChunk = next
         }
-        if (chunk.isEmpty()) return -1L // EOF 哨兵
-        sink.write(chunk)
-        return chunk.size.toLong()
+    }
+
+    private fun throwReadFailure() {
+        errorRef.get()?.let { failure ->
+            if (failure is IOException) throw failure
+            throw IOException("kathttp3 response body failed", failure)
+        }
     }
 
     override fun timeout(): Timeout = Timeout.NONE
 
-    override fun close() = onClose()
+    override fun close() {
+        if (closed.compareAndSet(false, true)) onClose()
+    }
 }

@@ -17,7 +17,7 @@ import java.util.concurrent.ConcurrentHashMap
  * kathttp3 原生 ECH/H3 传输管理（替换原 ech-proxy-go 本地代理）。
  *
  * - 持有 KatHttp3Client 单例：DoH 解析 + 目标域名 ech / CF 官方活值兜底。
- * - 通道判定缓存（域名 → DIRECT / KAT_HTTP3），失败驱动，进程内存态。
+ * - 通道判定缓存（域名 → DIRECT / KAT_HTTP3），以收到的响应确认路由，进程内存态。
  * - 保留 EchProxyProvider 接口语义与类名，App/DI/设置页无需改动。
  */
 class EchProxyManager(
@@ -116,10 +116,5 @@ class EchProxyManager(
 
     override fun recordDecision(host: String, decision: ChannelDecision) {
         decisions[host] = decision
-    }
-
-    override fun recordFailure(host: String) {
-        // 探测失败 → 后续直接走 kathttp3，不再反复 5s 探测
-        decisions[host] = ChannelDecision.KAT_HTTP3
     }
 }

@@ -31,19 +31,7 @@ class CloudflareInterceptor(
     private val executor = ContextCompat.getMainExecutor(context)
 
     override fun shouldIntercept(response: Response): Boolean {
-        // Check if Cloudflare anti-bot is on
-        return if (response.code in ERROR_CODES && response.header("Server") in SERVER_CHECK) {
-            val document = Jsoup.parse(
-                response.peekBody(Long.MAX_VALUE).string(),
-                response.request.url.toString(),
-            )
-
-            // solve with webview only on captcha, not on geo block
-            document.getElementById("challenge-error-title") != null ||
-                document.getElementById("challenge-error-text") != null
-        } else {
-            false
-        }
+        return response.isCloudflareChallenge()
     }
 
     override fun intercept(
@@ -149,6 +137,18 @@ class CloudflareInterceptor(
             throw CloudflareBypassException()
         }
     }
+}
+
+/** Shared Cloudflare challenge predicate for both the WebView handler and ECH retry routing. */
+internal fun Response.isCloudflareChallenge(): Boolean {
+    if (code !in ERROR_CODES || header("Server") !in SERVER_CHECK) return false
+    val document = Jsoup.parse(
+        peekBody(Long.MAX_VALUE).string(),
+        request.url.toString(),
+    )
+    // Solve with WebView only on a captcha challenge, not on a geo block.
+    return document.getElementById("challenge-error-title") != null ||
+        document.getElementById("challenge-error-text") != null
 }
 
 private val ERROR_CODES = listOf(403, 503)
