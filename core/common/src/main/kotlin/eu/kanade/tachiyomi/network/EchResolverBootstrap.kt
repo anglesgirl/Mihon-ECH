@@ -34,8 +34,11 @@ data class EchResolverBootstrap(
                 .flatMap(::splitCommaList)
                 .mapNotNull(::validatedHttpsEndpoint)
                 .distinct()
-            val endpoints = if (txtEndpoints.isNotEmpty()) txtEndpoints else
+            val endpoints = if (txtEndpoints.isNotEmpty()) {
+                txtEndpoints
+            } else {
                 configuredEndpoints.mapNotNull(::validatedHttpsEndpoint).distinct()
+            }
             val txtIps = splitCommaList(values["ip"] ?: values["ips"].orEmpty())
                 .filter(::isLiteralIp)
                 .distinct()
@@ -81,8 +84,11 @@ data class EchResolverBootstrap(
                 edgeIps.filter(::isLiteralIp).distinct().map { ResolvedAddress(it, port) }
             }
             return selected.map { address ->
-                if (address.echConfig != null || fallbackEchConfig == null) address
-                else address.copy(echConfig = fallbackEchConfig)
+                if (address.echConfig != null || fallbackEchConfig == null) {
+                    address
+                } else {
+                    address.copy(echConfig = fallbackEchConfig)
+                }
             }
         }
 

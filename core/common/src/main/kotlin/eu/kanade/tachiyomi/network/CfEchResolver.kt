@@ -24,6 +24,7 @@ class CfEchResolver(
     private val configuredEndpoints = EchResolverBootstrap.parseEndpointList(dohEndpoints.joinToString(","))
     private val configuredIps = configuredEdgeIps.filter { EchResolverBootstrap.isLiteralIp(it) }.distinct()
     private val dohResolvers = ConcurrentHashMap<String, DohResolver>()
+
     @Volatile private var bootstrap: EchResolverBootstrap? = null
 
     /** Cached official ECH values are fetched with the same verified HTTPS DoH transport. */
