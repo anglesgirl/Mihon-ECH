@@ -5,8 +5,8 @@ import dev.kathttp3.KatHttp3Client
 import dev.kathttp3.KatHttp3ClientConfig
 import eu.kanade.tachiyomi.network.CfEchResolver
 import eu.kanade.tachiyomi.network.ChannelDecision
-import eu.kanade.tachiyomi.network.EchResolverBootstrap
 import eu.kanade.tachiyomi.network.EchProxyProvider
+import eu.kanade.tachiyomi.network.EchResolverBootstrap
 import eu.kanade.tachiyomi.network.NetworkPreferences
 import logcat.LogPriority
 import tachiyomi.core.common.util.system.logcat
