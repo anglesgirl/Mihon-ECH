@@ -40,7 +40,10 @@ import eu.kanade.tachiyomi.data.coil.MangaCoverFetcher
 import eu.kanade.tachiyomi.data.coil.MangaCoverKeyer
 import eu.kanade.tachiyomi.data.coil.MangaKeyer
 import eu.kanade.tachiyomi.data.notification.Notifications
+import eu.kanade.tachiyomi.ech.EchDiagnostics
+import eu.kanade.tachiyomi.ech.EchProxyManager
 import eu.kanade.tachiyomi.extension.ExtensionManager
+import eu.kanade.tachiyomi.network.EchProxyRegistry
 import eu.kanade.tachiyomi.network.NetworkHelper
 import eu.kanade.tachiyomi.network.NetworkPreferences
 import eu.kanade.tachiyomi.ui.base.delegate.SecureActivityDelegate
@@ -94,6 +97,8 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
 
     @Inject private lateinit var networkPreferences: NetworkPreferences
 
+    @Inject private lateinit var echProxyManager: EchProxyManager
+
     @Inject private lateinit var uiPreferences: UiPreferences
 
     // Lazy: only the image loader uses these, and process starts without UI (workers, receivers) never build it
@@ -133,6 +138,17 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
 
         Injekt = InjektScope(MetroInjektRegistrar(application = this, graphProvider = this))
         graph.inject(this)
+
+        // ECH：注册 kathttp3 传输提供方，启动时按默认（开启）初始化
+        EchProxyRegistry.provider = echProxyManager
+        val echDiagnostics = EchDiagnostics(this)
+        echDiagnostics.start()
+        echDiagnostics.event(
+            "ech_config",
+            "enabled=${networkPreferences.echEnabled.get()} domain=${networkPreferences.echConfigDomain.get()}",
+        )
+        echProxyManager.setDiagnostics(echDiagnostics)
+        echProxyManager.startAsync()
 
         TelemetryConfig.init(applicationContext)
 

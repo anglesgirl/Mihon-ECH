@@ -37,7 +37,7 @@ android {
     defaultConfig {
         applicationId = "com.anglesgirl.mihonech"
 
-        versionCode = 2026110707
+        versionCode = 2026110708
         versionName = "0.21.3-echfix8"
 
         buildConfigField("boolean", "TELEMETRY_INCLUDED", "${Config.includeTelemetry}")
@@ -202,6 +202,9 @@ baselineProfile {
 }
 
 dependencies {
+    // kathttp3 原生 ECH/H3（EchProxyManager 使用；与 core/common 同一依赖）
+    // JitPack SNAPSHOT：default branch = main，jitpack.yml 已配置 Android 构建
+    implementation("com.github.anglesgirl:kathttp3-ech:main-SNAPSHOT")
     baselineProfile(projects.baselineProfile)
 
     implementation(projects.i18n)

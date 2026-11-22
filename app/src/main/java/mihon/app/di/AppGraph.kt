@@ -28,6 +28,7 @@ import eu.kanade.tachiyomi.data.library.MetadataUpdateWorker
 import eu.kanade.tachiyomi.data.notification.NotificationReceiver
 import eu.kanade.tachiyomi.data.track.TrackerManager
 import eu.kanade.tachiyomi.data.updater.AppUpdateChecker
+import eu.kanade.tachiyomi.ech.EchProxyManager
 import eu.kanade.tachiyomi.extension.ExtensionManager
 import eu.kanade.tachiyomi.extension.util.ExtensionInstallActivity
 import eu.kanade.tachiyomi.network.JavaScriptEngine
@@ -114,6 +115,7 @@ interface AppGraph : ViewModelGraph {
     val protoBuf: ProtoBuf
     val xml: XML
     val networkHelper: NetworkHelper
+    val echProxyManager: EchProxyManager
     val javaScriptEngine: JavaScriptEngine
 
     val getFavorites: GetFavorites
