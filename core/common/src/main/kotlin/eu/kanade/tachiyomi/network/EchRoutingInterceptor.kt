@@ -53,7 +53,7 @@ class EchRoutingInterceptor(
 
         when (provider.decision(host)) {
             ChannelDecision.DIRECT -> return chain.proceed(request)
-            ChannelDecision.KAT_HTTP3 -> return viaKatHttp3(k3, request, host)
+            ChannelDecision.KAT_HTTP3 -> return viaKatHttp3(k3, request, host, provider)
             ChannelDecision.UNKNOWN -> Unit
         }
 
@@ -66,13 +66,14 @@ class EchRoutingInterceptor(
             return probe.getOrThrow()
         }
         provider.recordFailure(host)
-        return viaKatHttp3(k3, request, host)
+        return viaKatHttp3(k3, request, host, provider)
     }
 
     private fun viaKatHttp3(
         k3: KatHttp3Client,
         request: okhttp3.Request,
         host: String,
+        provider: EchProxyProvider,
     ): Response {
         logcat(LogPriority.INFO) { "ECH: kathttp3 transport host=$host" }
         val k3Request = KatHttp3Request(
