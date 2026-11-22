@@ -12,8 +12,8 @@ class NetworkPreferences(
 
     val dohProvider: Preference<Int> = preferenceStore.getInt("doh_provider", -1)
 
-    // Optional generic TLS ECH routing through the bundled local proxy.
-    val echEnabled: Preference<Boolean> = preferenceStore.getBoolean("ech_enabled", false)
+    // ECH 默认开启：本 fork 的核心功能；用户可在设置 → 高级里手动关闭。
+    val echEnabled: Preference<Boolean> = preferenceStore.getBoolean("ech_enabled", true)
 
     val echConfigDomain: Preference<String> = preferenceStore.getString(
         "ech_config_domain",
